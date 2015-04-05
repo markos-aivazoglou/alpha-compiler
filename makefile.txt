@@ -1,0 +1,26 @@
+a.out(list): symtablelist.o testsytab.o
+	gcc -o symtablelist.o testsytab.o
+
+symtablelist.o: symtablelist.o symtable.h
+	gcc -c symtablelist.c
+
+testsytab.o: testsytab.o symtable.h
+	gcc -c testsymtab.c
+
+list:
+        gcc -Wall -pedantic -ansi symtablelist.c testsytab.c
+		
+
+
+a.out(hash): symtablehash.o testsytab.o
+	gcc -o symtablehash.o testsytab.o
+
+symtablehash.o: symtablehash.c sytable.h
+	gcc -c symtablehash.c
+
+testsytab.o: testsytab.c symtable.h
+	gcc -c testsytab.c
+
+
+hash:
+		gcc -Wall -pedantic -ansi symtablehash.c testsytab.c
