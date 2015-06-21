@@ -9,22 +9,22 @@ unsigned int totalStrConsts = 0;
 unsigned int globalvars = 0;
 
 struct libraryfuncMap {
-char *id;
-library_func_t address;
-struct libraryfuncMap *next;
+	char *id;
+	library_func_t address;
+	struct libraryfuncMap *next;
 };
 
 struct libraryfuncMap *libraryFunctionsMap[12]={NULL};
 
 int pre_hashnum(char *s)
 {
-unsigned int i;
-int hash=0;
-for(i=0; i<strlen(s); i++)
-{
-hash+= s[i];
-}
-return hash;
+	unsigned int i;
+	int hash=0;
+	for(i=0; i<strlen(s); i++)
+	{
+		hash+= s[i];
+	}
+	return hash;
 }
 
 
@@ -70,14 +70,12 @@ struct avm_memcell* avm_translate_operand (struct vmarg* arg,struct avm_memcell*
 
 void execute_cycle(void){
 	if(executionFinished){
-	    
-	    return;
-	}
-	else
-	if(pc == AVM_ENDING_PC){
-		executionFinished = 1;
 		return;
 	}
+	else if(pc == AVM_ENDING_PC){
+		executionFinished = 1;
+		return;
+		}
 	else{
 		assert(pc < AVM_ENDING_PC);
 		struct instruction* instr = code + pc;
@@ -88,6 +86,7 @@ void execute_cycle(void){
 		if(instr->srcLine)
 			currLine = instr->srcLine;
 		unsigned oldPC = pc;
+		printf("top:%d\n",top);
 		(*executeFuncs[instr->opcode])(instr);
 		if(pc == oldPC)
 			++pc;
@@ -101,7 +100,7 @@ void avm_memcellclear (struct avm_memcell* m){
 		if (f){
 			(*f)(m);
 		}
-			m->type = undef_m;
+		m->type = undef_m;
 	}
 }
 
@@ -121,9 +120,8 @@ extern void memclear_table(struct avm_memcell* m){
 void execute_assign (struct instruction* instr) {
 	struct avm_memcell* lv = avm_translate_operand(&instr->result,(struct avm_memcell*) 0);
 	struct avm_memcell* rm = avm_translate_operand(&instr->arg1,&ax);
-	//assert(lv && ( &stack[N-1] >= lv && lv > &stack[top] || lv == &retval));
+	assert(lv && ( &stack[topsp-1] >= lv && lv > &stack[top] || lv == &retval));
 	assert(rm);
-	
 	avm_assign(lv,rm);
 }
 
@@ -146,11 +144,11 @@ void avm_assign (struct avm_memcell* lv,struct avm_memcell* rv){
 	// Now take care of copied values or reference counting
 	
 	if(lv->type == string_m)
-			lv->data.strVal = strdup(rv->data.strVal);
+		lv->data.strVal = strdup(rv->data.strVal);
 			
 	else{
 		if(lv->type == table_m)
-				avm_tableincrefcounter(lv->data.tableVal);
+			avm_tableincrefcounter(lv->data.tableVal);
 	}
 }
 
@@ -161,6 +159,7 @@ void execute_call (struct instruction* instr) {
 	struct avm_memcell* func = avm_translate_operand(&instr->result, &ax);
 	assert(func);
 	avm_callsaveenvironment();
+	puts("calling");
 	switch (func->type) {
 	
 		case userfunc_m : {
@@ -186,7 +185,6 @@ void execute_call (struct instruction* instr) {
 
 void avm_dec_top (void){   //CALLING FUNCTIONS
 	if(!top){		//stack overflow
-		avm_error("stack overflow");
 		executionFinished = 1;
 		
 	}
@@ -197,9 +195,9 @@ void avm_dec_top (void){   //CALLING FUNCTIONS
 
 
 void avm_push_envvalue(unsigned int val) {
-		stack[top].type = number_m;
-		stack[top].data.numVal = val;
-		avm_dec_top;
+	stack[top].type = number_m;
+	stack[top].data.numVal = val;
+	avm_dec_top();
 }
 
 void avm_callsaveenvironment (void){
@@ -217,30 +215,32 @@ void execute_funcenter (struct instruction* instr){
 		
 		/* Callee actions here */
 		totalActuals = 0;
-//  		struct userfunc* funcInfo = avm_getfuncinfo(pc);
+ 		// struct userfunc* funcInfo = avm_getfuncinfo(pc);
+ 		puts("funcenter");
 		topsp = top;
-// 		top = top - funcInfo->localSize;
+		// top = top - funcInfo->localSize;
 }
 	
 unsigned int avm_get_envvalue (unsigned int i) {
-//	assert(stack[i].type == number_m);
+	assert(stack[i].type == number_m);
 	unsigned int val = (unsigned int) stack[i].data.numVal;
 	assert(stack[i].data.numVal == ((double) val));
 	return val;
 }
 
 void execute_funcexit(struct instruction* unused) {				/* Epanafora prohgoumenou perivallontos,kai epistrofh apo thn klhsh */
-		unsigned int oldTop = top;
-		top = 		avm_get_envvalue(topsp + AVM_SAVEDTOP_OFFSET);
-		pc = 		avm_get_envvalue(topsp + AVM_SAVEDPC_OFFSET);
-		topsp = 	avm_get_envvalue(topsp + AVM_SAVEDTOPSP_OFFSET);
-		
-		while(oldTop++ <= top) /* Intentionally ignoring first*/     /* GARBADGE COLLECTION */
-			avm_memcellclear(&stack[oldTop]);
+	unsigned int oldTop = top;
+	top = 		avm_get_envvalue(topsp + AVM_SAVEDTOP_OFFSET);
+	pc = 		avm_get_envvalue(topsp + AVM_SAVEDPC_OFFSET);
+	topsp = 	avm_get_envvalue(topsp + AVM_SAVEDTOPSP_OFFSET);
+	
+	while(oldTop++ <= top) /* Intentionally ignoring first*/     /* GARBADGE COLLECTION */
+		avm_memcellclear(&stack[oldTop]);
 }
 
 void avm_calllibfunc(char* id) {
 	library_func_t f = avm_getlibraryfunc(id);
+	puts("lib");
 	if(!f){
 		avm_error ("unsupported lib func \'%s\' is called!",id);
 		executionFinished = 1;
@@ -258,13 +258,12 @@ void avm_calllibfunc(char* id) {
 
 
 unsigned int avm_totalactuals(void){
-		return avm_get_envvalue(topsp + AVM_NUMACTUALS_OFFSET);
+	return avm_get_envvalue(topsp + AVM_NUMACTUALS_OFFSET);
 }
 
 struct avm_memcell* avm_getactual(unsigned int i){
-		assert(i < avm_totalactuals());
-		//printf("stack type :%d value : %f\n",stack[topsp + AVM_STACKENV_SIZE + 1 +i].type,stack[topsp + AVM_STACKENV_SIZE + 1 +i].data.numVal);
-		return &stack[topsp + AVM_STACKENV_SIZE  +i];
+	assert(i < avm_totalactuals());
+	return &stack[topsp + AVM_STACKENV_SIZE + 1 +i];
 		
   
 }
@@ -280,31 +279,47 @@ void execute_pusharg (struct instruction* instr) {
 	assert(arg);
 	
 	/* This is actually stack[top] = arg, but we have to use avm_assign.*/
- 	//printf("arg type :%d value : %f\n",arg->type,arg->data.numVal);
+ 	// printf("arg type :%d value : %f\n",arg->type,arg->data.numVal);
 	avm_assign(&stack[top],arg);
-//  	printf("stack type :%d value : %f\n",stack[top].type,stack[top].data.numVal);
+ 	// printf("stack type :%d value : %f\n",stack[top].type,stack[top].data.numVal);
+ 	printf("top:%d\n",top);
 	++totalActuals;
+	// printf("totalactuals:%d\n",totalActuals);
 	avm_dec_top();
 }
 
 char* avm_tostring(struct avm_memcell* m) {
-// 	assert(m->type >= 0 && m->type < undef_m);
+	assert(m->type >= 0 && m->type < undef_m);
+
+	// printf("%s %d\n",m->type,undef_m);
 	return (*tostringFuncs[m->type])(m);
 }
 
-double add_impl(double x, double y){return x+y;}
-double sub_impl(double x, double y){return x-y;}
-double mul_impl(double x, double y){return x*y;}
-double div_impl(double x, double y){if(y==0)printf("Cannot divide with 0\n");return x/y;} 	// Prepei na ginei error check, gia /0 px. Oxi na trwme error tou gcc.
-double mod_impl(double x, double y){if(y==0)printf("Cannot MOD with 0\n");
-return ((unsigned) x) % ((unsigned) y);		// Error check
+double add_impl(double x, double y){
+	return x+y;
+}
+double sub_impl(double x, double y){
+	return x-y;
+}
+double mul_impl(double x, double y){
+	return x*y;
+}
+double div_impl(double x, double y){
+	if(y==0)
+		printf("Cannot divide with 0\n");
+	return x/y;
+} 	// Prepei na ginei error check, gia /0 px. Oxi na trwme error tou gcc.
+double mod_impl(double x, double y){
+	if(y==0)
+		printf("Cannot MOD with 0\n");
+	return ((unsigned) x) % ((unsigned) y);		// Error check
 }
 void execute_arithmetic(struct instruction* instr){
 	struct avm_memcell* lv = avm_translate_operand(&instr->result,(struct avm_memcell*)0);
 	struct avm_memcell* rv1 = avm_translate_operand(&instr->arg1, &ax);
 	struct avm_memcell* rv2 = avm_translate_operand(&instr->arg2, &bx);
 	
-	//assert(lv && (&stack[0] <= lv && &stack[top] > lv || lv==&retval));
+	assert(lv && (&stack[0] <= lv && &stack[top] > lv || lv==&retval));
 	assert(rv1 && rv2);
 	
 	if(rv1->type != number_m || rv2->type != number_m){
@@ -374,11 +389,11 @@ void execute_jeq(struct instruction* instr){
 void execute_newtable(struct instruction* instr){         
 	puts("awdsawdwad");
 	struct avm_memcell* lv = avm_translate_operand(&instr->arg1, (struct avm_memcell*)0);
-// 	assert(lv && (&stack[N-1] >=lv && &stack[top] < lv || lv == &retval));
+	assert(lv && (&stack[topsp-1] >=lv && &stack[top] < lv || lv == &retval));
 	avm_memcellclear(lv);
 	
-	lv->type			= table_m;
-	lv->data.tableVal		= avm_tablenew();
+	lv->type = table_m;
+	lv->data.tableVal = avm_tablenew();
 	avm_tableincrefcounter(lv->data.tableVal);
 	
 }
@@ -387,9 +402,8 @@ void execute_tablegetelem(struct instruction* instr){
 	struct avm_memcell* lv = avm_translate_operand(&instr->result,(struct avm_memcell*)0);
 	struct avm_memcell* t = avm_translate_operand(&instr->arg1,(struct avm_memcell*)0);
 	struct avm_memcell* i = avm_translate_operand(&instr->arg2, &ax);
-	
-// 	assert(lv && (&stack[N-1] >= lv && &stack[top] < lv || lv == &retval));
-// 	assert(t && &stack[N-1] >= t && &stack[top] < t);
+	assert(lv && (&stack[topsp-1] >= lv && &stack[top] < lv || lv == &retval));
+	assert(t && &stack[topsp-1] >= t && &stack[top] < t);
 	assert(i);
 	
 	avm_memcellclear(lv);
@@ -437,9 +451,8 @@ static void avm_initstack(void){
 void avm_initialize(void) {
 
 	avm_readbinary();
-	top = AVM_STACKSIZE - 2 - globalvars;
-	topsp = top;
 	avm_initstack();
+	top = AVM_STACKSIZE - 1 - globalvars;
 	avm_registerlibfunc("print",libfunc_print);
 // 	avm_registerlibfunc("typeof",libfunc_typeof);
 // 	avm_registerlibfunc("totalarguments",libfunc_totalarguments);
@@ -450,14 +463,14 @@ void avm_initialize(void) {
 	
 }
 void libfunc_print(void){
-		unsigned int n = avm_totalactuals();
-		printf("total this time %d\n",n);
-		unsigned int i;
-		for(i = 0;i<n+1;++i){/*GIATI TOTAL ACTUALS 3*/
+	unsigned int n = avm_totalactuals();
+	printf("total this time %d\n",n);
+	unsigned int i;
+	for(i = 0;i<n;i++){/*GIATI TOTAL ACTUALS 3*/
 		char* s = strdup(avm_tostring(avm_getactual(i)));
 		puts(s);
 		free(s);
-		}
+	}
 }
 
 void libfunc_typeof(void){
@@ -564,16 +577,20 @@ void avm_readbinary(void){
 	double number;
 	unsigned int inst1,inst2,inst;
 	memset(buf,'\0',sizeof(buf));
+	
 	fp = fopen("target.txt","r");
 	fscanf(fp,"%s",buf);
 	i = atoi(buf);
-	//printf("magic %d\n",i);
-	if (i != magicnumber){puts("wrong identifier");}
+	
+	if (i != magicnumber){
+		puts("wrong identifier");
+	}
 	fscanf(fp,"%s",buf);//Table name
 	fscanf(fp,"%s",buf);//STR Contents
 	i = atoi(buf);
 	totalStrConsts = i;
 	/*read string table*/
+	
 	for(j=0;j<i;j++){
 	    fscanf(fp,"%s",buf);
 	    stringConsts[j] = strdup(buf);
@@ -624,11 +641,11 @@ void avm_readbinary(void){
 	    (code+j)->arg1.type = inst1;
 	    tok[1] = strtok(NULL,",");
 	    if(tok[1]){
-	      inst2 = strtol(tok[1],NULL,10);
-	      (code+j)->arg1.val = inst2;
-	      if(inst1==1 && globalvars<=inst2){
-		globalvars++;
-	      }
+			inst2 = strtol(tok[1],NULL,10);
+			(code+j)->arg1.val = inst2;
+			if(inst1==1 && globalvars<=inst2){
+				globalvars++;
+			}
 	    }
 	    tok[0]=NULL;
 	    tok[1]=NULL;
@@ -639,11 +656,11 @@ void avm_readbinary(void){
 	    (code+j)->arg2.type = inst2;
 	    tok[1] = strtok(NULL,",");
 	    if(tok[1]){
-	      inst2 = strtol(tok[1],NULL,10);
-	      (code+j)->arg2.val = inst2;
-	      if(inst1==1 && globalvars<=inst2){
-		globalvars++;
-	      }
+			inst2 = strtol(tok[1],NULL,10);
+			(code+j)->arg2.val = inst2;
+			if(inst1==1 && globalvars<=inst2){
+				globalvars++;
+			}
 	    }
 	    tok[0]=NULL;
 	    tok[1]=NULL;
@@ -655,11 +672,11 @@ void avm_readbinary(void){
 	    (code+j)->result.type = inst1;
 	    tok[1] = strtok(NULL,",");
 	    if(tok[1]){
-	      inst2 = strtol(tok[1],NULL,10);
-	      (code+j)->result.val = inst2;
-	      if(inst1==1 && globalvars<=inst2){
-		globalvars++;
-	      }
+			inst2 = strtol(tok[1],NULL,10);
+			(code+j)->result.val = inst2;
+			if(inst1==1 && globalvars<=inst2){
+				globalvars++;
+			}
 	    }
 	    tok[0]=NULL;
 	    tok[1]=NULL;
@@ -678,17 +695,17 @@ void avm_tablesetelem(struct avm_table* table,struct avm_memcell* index,struct a
 void avm_warning(char* format,...){}
 
 void avm_registerlibfunc(char* id,library_func_t addr){
-  /*int hashindex = (pre_hashnum(id)*211)%12;
-  struct libraryfuncMap *newbucket = (struct libraryfuncMap *)malloc(sizeof(struct libraryfuncMap));
-  newbucket->id = strdup(id);
-  newbucket->address = addr;
-/*In order to save time at entering we put the new bucket in the front of the bucket list
-newbucket->next = libraryFunctionsMap[hashindex];
-libraryFunctionsMap[hashindex] = newbucket;*/
-    struct libraryfuncMap *newbucket = (struct libraryfuncMap *)malloc(sizeof(struct libraryfuncMap));
-    newbucket->id = strdup(id);
-    newbucket->address = addr;
-    libraryFunctionsMap[0]=newbucket;
+  /*int hashindex = (pre_hashnum(id)*211)%12;*/
+	// struct libraryfuncMap *newbucket = (struct libraryfuncMap *)malloc(sizeof(struct libraryfuncMap));
+	// newbucket->id = strdup(id);
+	// newbucket->address = addr;
+/*In order to save time at entering we put the new bucket in the front of the bucket list*/
+	// newbucket->next = libraryFunctionsMap[hashindex];
+	// libraryFunctionsMap[hashindex] = newbucket;
+	struct libraryfuncMap *newbucket = (struct libraryfuncMap *)malloc(sizeof(struct libraryfuncMap));
+	newbucket->id = strdup(id);
+	newbucket->address = addr;
+	libraryFunctionsMap[0]=newbucket;
 }
 
 
@@ -703,9 +720,22 @@ void execute_jle(struct instruction* instr){}
 void execute_jump(struct instruction* instr){}
 void execute_jgt(struct instruction* instr){}
 void execute_nop(struct instruction* instr){}
-char* number_tostring(struct avm_memcell* m){char *buff;buff = malloc(sizeof(m->data.numVal));memset(buff,'\0',sizeof(buff));sprintf(buff,"%f",m->data.numVal);return buff;}
-char* string_tostring(struct avm_memcell* m){return m->data.strVal;}
-char* bool_tostring(struct avm_memcell* m){char *buff;buff = malloc(sizeof(m->data.boolVal));memset(buff,'\0',sizeof(buff));sprintf(buff,"%c",m->data.boolVal);return buff;}
+
+char* number_tostring(struct avm_memcell* m){
+	char *buff;buff = malloc(sizeof(m->data.numVal));
+	memset(buff,'\0',sizeof(buff));
+	sprintf(buff,"%f",m->data.numVal);
+	return buff;
+}
+char* string_tostring(struct avm_memcell* m){
+	return m->data.strVal;
+}
+char* bool_tostring(struct avm_memcell* m){
+	char *buff;buff = malloc(sizeof(m->data.boolVal));
+	memset(buff,'\0',sizeof(buff));
+	sprintf(buff,"%c",m->data.boolVal);
+	return buff;
+}
 char* table_tostring(struct avm_memcell* m){}
 char* userfunc_tostring(struct avm_memcell* m){}
 char* libfunc_tostring(struct avm_memcell* m){}
@@ -717,12 +747,12 @@ char* undef_tostring(struct avm_memcell* m){}
 void printDouble(double x){
 	double z;
 	int y;
-    	y = (int)x;
+    y = (int)x;
    	z = (x-y);
    	if(z == 0)
-               	printf("%.f\t",x);
-   		else
-                	printf("%f\t",x);
+       	printf("%.f\t",x);
+   	else
+       	printf("%f\t",x);
 }
 void printNumTable(){
 	unsigned int index;
@@ -733,18 +763,18 @@ void printNumTable(){
 	puts("------------------ NUM_TABLE End ------------------");
 }
 void printUserfuncTable(){
-  unsigned int index;
-  puts("****************** USERFUNC_TABLE Start ******************");
-  for(index=0;index<totalUserFuncs;index++){
-      printf("%d|\t%s\n",index,(userFuncs[index].id));
-  }
-  puts("------------------ USERFUNC_TABLE End ------------------");
+	unsigned int index;
+	puts("****************** USERFUNC_TABLE Start ******************");
+	for(index=0;index<totalUserFuncs;index++){
+		printf("%d|\t%s\n",index,(userFuncs[index].id));
+	}
+	puts("------------------ USERFUNC_TABLE End ------------------");
 }
 
 void main(void){
     avm_initialize();
     while(!executionFinished){
-	execute_cycle();
+		execute_cycle();
     }
   
 }
