@@ -55,6 +55,7 @@ struct avm_memcell* avm_translate_operand (struct vmarg* arg,struct avm_memcell*
 		case nil_a: reg->type = nil_m; return reg;
 		case userfunc_a:{
 			reg->type = userfunc_m;
+			printf("user arg val:%d\n",arg->val);
 			reg->data.funcVal = arg->val;
 			return reg;
 		}
@@ -86,7 +87,7 @@ void execute_cycle(void){
 		if(instr->srcLine)
 			currLine = instr->srcLine;
 		unsigned oldPC = pc;
-		printf("top:%d\n",top);
+		// printf("pc:%d\n",pc);
 		(*executeFuncs[instr->opcode])(instr);
 		if(pc == oldPC)
 			++pc;
@@ -159,7 +160,6 @@ void execute_call (struct instruction* instr) {
 	struct avm_memcell* func = avm_translate_operand(&instr->result, &ax);
 	assert(func);
 	avm_callsaveenvironment();
-	puts("calling");
 	switch (func->type) {
 	
 		case userfunc_m : {
@@ -211,14 +211,13 @@ void avm_callsaveenvironment (void){
 void execute_funcenter (struct instruction* instr){
 		struct avm_memcell* func = avm_translate_operand(&instr->result,&ax);
 		assert(func);
+		printf("funcval:%d\n",func->data.funcVal);
 		assert(pc == func->data.funcVal); /*  func address should match pc*/
-		
 		/* Callee actions here */
 		totalActuals = 0;
- 		// struct userfunc* funcInfo = avm_getfuncinfo(pc);
- 		puts("funcenter");
+ 		struct userfunc* funcInfo = avm_getfuncinfo(pc);
 		topsp = top;
-		// top = top - funcInfo->localSize;
+		top = top - funcInfo->localSize;
 }
 	
 unsigned int avm_get_envvalue (unsigned int i) {
@@ -240,7 +239,6 @@ void execute_funcexit(struct instruction* unused) {				/* Epanafora prohgoumenou
 
 void avm_calllibfunc(char* id) {
 	library_func_t f = avm_getlibraryfunc(id);
-	puts("lib");
 	if(!f){
 		avm_error ("unsupported lib func \'%s\' is called!",id);
 		executionFinished = 1;
@@ -256,7 +254,11 @@ void avm_calllibfunc(char* id) {
 }
 
 
+struct userfunc* avm_getfuncinfo(unsigned int index){
 
+	assert(index < totalUserFuncs);
+	return &userFuncs[index];
+}
 unsigned int avm_totalactuals(void){
 	return avm_get_envvalue(topsp + AVM_NUMACTUALS_OFFSET);
 }
@@ -277,21 +279,14 @@ struct avm_memcell* avm_getactual(unsigned int i){
 void execute_pusharg (struct instruction* instr) {
 	struct avm_memcell* arg = avm_translate_operand(&instr->result,&ax);
 	assert(arg);
-	
 	/* This is actually stack[top] = arg, but we have to use avm_assign.*/
- 	// printf("arg type :%d value : %f\n",arg->type,arg->data.numVal);
 	avm_assign(&stack[top],arg);
- 	// printf("stack type :%d value : %f\n",stack[top].type,stack[top].data.numVal);
- 	printf("top:%d\n",top);
 	++totalActuals;
-	// printf("totalactuals:%d\n",totalActuals);
 	avm_dec_top();
 }
 
 char* avm_tostring(struct avm_memcell* m) {
 	assert(m->type >= 0 && m->type < undef_m);
-
-	// printf("%s %d\n",m->type,undef_m);
 	return (*tostringFuncs[m->type])(m);
 }
 
@@ -319,7 +314,7 @@ void execute_arithmetic(struct instruction* instr){
 	struct avm_memcell* rv1 = avm_translate_operand(&instr->arg1, &ax);
 	struct avm_memcell* rv2 = avm_translate_operand(&instr->arg2, &bx);
 	
-	assert(lv && (&stack[0] <= lv && &stack[top] > lv || lv==&retval));
+	assert(lv && (&stack[topsp-1] >=lv && lv > &stack[top] || lv==&retval));
 	assert(rv1 && rv2);
 	
 	if(rv1->type != number_m || rv2->type != number_m){
@@ -360,12 +355,17 @@ void execute_jeq(struct instruction* instr){
 	
 	unsigned char result = 0;
 	
-	if(rv1->type == undef_m || rv2->type == undef_m)
+	if(rv1->type == undef_m || rv2->type == undef_m){
 		avm_error("'undef' involved in equality!\n");
-	else if(rv1->type == nil_m || rv2->type == nil_m)
+	}
+	else if(rv1->type == nil_m || rv2->type == nil_m){
 		result = (rv1->type == nil_m && rv2->type == nil_m);
-	else if(rv1->type == bool_m || rv2->type == bool_m)
+	}
+	else if(rv1->type == bool_m || rv2->type == bool_m){
+		printf("im in\n");
 		result = (avm_tobool(rv1) == avm_tobool(rv2));
+		// printf("result on eq:%d on pc:%d\n",result,pc);
+	}
 	else if(rv1->type != rv2 -> type){
 		avm_error(
 			"%s == %s is illegal!\n",
@@ -375,19 +375,173 @@ void execute_jeq(struct instruction* instr){
 	}
 	else{
 		/* Equality check with dispatching. */
+		switch(rv1->type){
+			case number_m:{
+				result= rv1->data.numVal == rv2->data.numVal;
+				break;
+			}
+			case string_m: {
+				if(strcmp(rv1->data.strVal, rv2->data.strVal)==0)
+				{
+					result =1;
+				}
+				else
+				{
+					result = 0;
+				}
+				break;
+			}
+			case userfunc_m: {
+				result= rv1->data.funcVal == rv2->data.funcVal;
+			}
+			case libfunc_m: {
+				if(strcmp(rv1->data.libfuncVal, rv2->data.libfuncVal)==0)
+				{
+					result =1;
+				}
+				else
+				{
+					result = 0;
+				}
+				break;
+			}
+			case table_m: {
+				if(rv1->data.tableVal == rv2->data.tableVal)
+				{
+					result =1;
+				}
+				else
+				{
+					result = 0;
+				}
+				break;
+			}
+			default: assert(0);
+		}		
+	}
+	if(!executionFinished && result){
+		printf("label on eq:%d\n",instr->result.val);
+		pc = instr->result.val;
+	}
+}
+void execute_jne(struct instruction* instr){
+	assert(instr->result.type == label_a);
+	struct avm_memcell* rv1 = avm_translate_operand(&instr->arg1, &ax);
+	struct avm_memcell* rv2 = avm_translate_operand(&instr->arg2, &bx);
+	
+	unsigned char result = 0;
+	
+	if(rv1->type == undef_m || rv2->type == undef_m){
+		avm_error("'undef' involved in unequality!\n");
+	}
+	else if(rv1->type == nil_m || rv2->type == nil_m){
+		result = (rv1->type != nil_m || rv2->type != nil_m);
+	}
+	else if(rv1->type == bool_m || rv2->type == bool_m){
+		result = (avm_tobool(rv1) != avm_tobool(rv2));
+		printf("result:%d\n",result);
+	}
+	else if(rv1->type != rv2 -> type){
+		avm_error(
+			"%s != %s is illegal!\n",
+			typeStrings[rv1->type],
+			typeStrings[rv2->type]
+		);
+	}
+	else{
+		/* Equality check with dispatching. */
+		switch(rv1->type){
+			case number_m:{
+				puts("FUCKFUCK");
+				result= rv1->data.numVal != rv2->data.numVal;
+				break;
+			}
+			case string_m: {
+				if(strcmp(rv1->data.strVal, rv2->data.strVal)!=0)
+				{
+					result =1;
+				}
+				else
+				{
+					result = 0;
+				}
+				break;
+			}
+			case userfunc_m: {
+				result= rv1->data.funcVal != rv2->data.funcVal;
+			}
+			case libfunc_m: {
+				if(strcmp(rv1->data.libfuncVal, rv2->data.libfuncVal)!=0)
+				{
+					result =1;
+				}
+				else
+				{
+					result = 0;
+				}
+				break;
+			}
+			case table_m: {
+				if(rv1->data.tableVal != rv2->data.tableVal)
+				{
+					result =1;
+				}
+				else
+				{
+					result = 0;
+				}
+				break;
+			}
+			default: assert(0);
+		}		
 	}
 	if(!executionFinished && result)
+		printf("label:%d\n",instr->result.val);
 		pc = instr->result.val;
 }
 
-/* End of equality operations */
+char cmp_gt(double x, double y){return x>y;}
+char cmp_ge(double x, double y){return x>=y;}
+char cmp_lt(double x, double y){return x<y;}
+char cmp_le(double x, double y){return x<=y;}
 
+void execute_comparative(struct instruction* instr){
+	assert(instr->result.type == label_a);
+	struct avm_memcell* rv1 = avm_translate_operand(&instr->arg1, &ax);
+	struct avm_memcell* rv2 = avm_translate_operand(&instr->arg2, &bx);
+	cmp_func op;
+	unsigned char result = 0;
+	if(rv1->type != number_m || rv2->type != number_m) {
+		avm_error("not a number in arithmetic!");
+	}
+	else{
+		assert((instr->opcode - jle_v)>=0);
+		op = comparisonFuncs[instr->opcode - jle_v];
+		// printf("opcode:%d\n",instr->opcode - jle_v);
+		result = (*op) (rv1->data.numVal, rv2->data.numVal);
+		// printf("result on comp:%d\n",result);	
+	}
+	if(!executionFinished && result){
+		// printf("label:%d\n",instr->result.val);
+		pc = instr->result.val;
+	}
+
+}
+
+void execute_jump(struct instruction* instr){
+	assert(instr->result.type == label_a);
+	pc = instr->result.val;	
+	// printf("pc on jump:%d\n",pc);
+
+}
+
+/* End of equality operations */
+// void execute_nop(instruction* instr){}
 
 
 
 /* TABLES*/
 void execute_newtable(struct instruction* instr){         
-	puts("awdsawdwad");
 	struct avm_memcell* lv = avm_translate_operand(&instr->arg1, (struct avm_memcell*)0);
 	assert(lv && (&stack[topsp-1] >=lv && &stack[top] < lv || lv == &retval));
 	avm_memcellclear(lv);
@@ -454,8 +608,8 @@ void avm_initialize(void) {
 	avm_initstack();
 	top = AVM_STACKSIZE - 1 - globalvars;
 	avm_registerlibfunc("print",libfunc_print);
-// 	avm_registerlibfunc("typeof",libfunc_typeof);
-// 	avm_registerlibfunc("totalarguments",libfunc_totalarguments);
+	avm_registerlibfunc("typeof",libfunc_typeof);
+	avm_registerlibfunc("totalarguments",libfunc_totalarguments);
 
 	
 	/* SAME FOR ALL THE REST LIBRARY FUNCTIONS */
@@ -464,7 +618,7 @@ void avm_initialize(void) {
 }
 void libfunc_print(void){
 	unsigned int n = avm_totalactuals();
-	printf("total this time %d\n",n);
+	// printf("total this time %d\n",n);
 	unsigned int i;
 	for(i = 0;i<n;i++){/*GIATI TOTAL ACTUALS 3*/
 		char* s = strdup(avm_tostring(avm_getactual(i)));
@@ -496,7 +650,7 @@ void libfunc_totalarguments(void){
 	}
 	else{
 		/* Extract the number of actual arguments for 
-		the previous activarion record. */
+		the previous activation record. */
 		retval.type = number_m;
 		retval.data.numVal = avm_get_envvalue(p_topsp + AVM_NUMACTUALS_OFFSET);
 	}
@@ -568,6 +722,95 @@ void avm_tabledestroy(struct avm_table* t){
 	avm_tablebucketsdestroy(t->strIndexed);
 	avm_tablebucketsdestroy(t->numIndexed);
 	free(t);
+}
+
+
+
+double consts_getnumber(unsigned int index){return numConsts[index];}
+char* consts_getstring(unsigned int index){return stringConsts[index];}
+char* libfuncs_getused(unsigned int index){return namedLibFuncs[index];}
+
+
+void avm_error(char* format,...){}
+
+
+library_func_t avm_getlibraryfunc(char* id){
+	int hashindex = (pre_hashnum(id)*211)%12;
+	return libraryFunctionsMap[hashindex]->address;
+}
+struct avm_memcell* avm_tablegetelem(struct avm_table* table,struct avm_memcell* index){}
+
+void avm_tablesetelem(struct avm_table* table,struct avm_memcell* index,struct avm_memcell* content){}
+
+void avm_warning(char* format,...){}
+
+void avm_registerlibfunc(char* id,library_func_t addr){
+  	int hashindex = (pre_hashnum(id)*211)%12;
+	struct libraryfuncMap *newbucket = (struct libraryfuncMap *)malloc(sizeof(struct libraryfuncMap));
+	newbucket->id = strdup(id);
+	newbucket->address = addr;
+	libraryFunctionsMap[hashindex]=newbucket;
+}
+
+
+void execute_not(struct instruction* instr){}
+void execute_uminus(struct instruction* instr){}
+void execute_and(struct instruction* instr){}
+void execute_or(struct instruction* instr){}
+
+
+void execute_nop(struct instruction* instr){}
+
+
+
+char* number_tostring(struct avm_memcell* m){
+	char *buff;buff = malloc(sizeof(m->data.numVal));
+	memset(buff,'\0',sizeof(buff));
+	sprintf(buff,"%f",m->data.numVal);
+	return buff;
+}
+char* string_tostring(struct avm_memcell* m){
+	return m->data.strVal;
+}
+char* bool_tostring(struct avm_memcell* m){
+	char *buff;buff = malloc(sizeof(m->data.boolVal));
+	memset(buff,'\0',sizeof(buff));
+	sprintf(buff,"%c",m->data.boolVal);
+	return buff;
+}
+char* table_tostring(struct avm_memcell* m){}
+char* userfunc_tostring(struct avm_memcell* m){}
+char* libfunc_tostring(struct avm_memcell* m){}
+char* nil_tostring(struct avm_memcell* m){}
+char* undef_tostring(struct avm_memcell* m){}
+
+
+
+void printDouble(double x){
+	double z;
+	int y;
+    y = (int)x;
+   	z = (x-y);
+   	if(z == 0)
+       	printf("%.f\t",x);
+   	else
+       	printf("%f\t",x);
+}
+void printNumTable(){
+	unsigned int index;
+	puts("****************** NUM_TABLE Start ******************");
+	for(index=0;index<totalNumConsts;index++){
+		printf("%d|\t",index);printDouble(numConsts[index]);printf("\n");
+	}
+	puts("------------------ NUM_TABLE End ------------------");
+}
+void printUserfuncTable(){
+	unsigned int index;
+	puts("****************** USERFUNC_TABLE Start ******************");
+	for(index=0;index<totalUserFuncs;index++){
+		printf("%d|\t%s\n",index,(userFuncs[index].id));
+	}
+	puts("------------------ USERFUNC_TABLE End ------------------");
 }
 
 void avm_readbinary(void){
@@ -652,8 +895,8 @@ void avm_readbinary(void){
 	    
 	    fscanf(fp,"%s",buf);
 	    tok[0] = strtok(buf,",");
-	    inst2 = strtol(tok[0],NULL,10);
-	    (code+j)->arg2.type = inst2;
+	    inst1 = strtol(tok[0],NULL,10);
+	    (code+j)->arg2.type = inst1;
 	    tok[1] = strtok(NULL,",");
 	    if(tok[1]){
 			inst2 = strtol(tok[1],NULL,10);
@@ -681,94 +924,6 @@ void avm_readbinary(void){
 	    tok[0]=NULL;
 	    tok[1]=NULL;
 	}
-}
-
-double consts_getnumber(unsigned int index){return numConsts[index];}
-char* consts_getstring(unsigned int index){return stringConsts[index];}
-char* libfuncs_getused(unsigned int index){return namedLibFuncs[index];}
-
-
-void avm_error(char* format,...){}
-library_func_t avm_getlibraryfunc(char* id){return libraryFunctionsMap[0]->address;}
-struct avm_memcell* avm_tablegetelem(struct avm_table* table,struct avm_memcell* index){}
-void avm_tablesetelem(struct avm_table* table,struct avm_memcell* index,struct avm_memcell* content){}
-void avm_warning(char* format,...){}
-
-void avm_registerlibfunc(char* id,library_func_t addr){
-  /*int hashindex = (pre_hashnum(id)*211)%12;*/
-	// struct libraryfuncMap *newbucket = (struct libraryfuncMap *)malloc(sizeof(struct libraryfuncMap));
-	// newbucket->id = strdup(id);
-	// newbucket->address = addr;
-/*In order to save time at entering we put the new bucket in the front of the bucket list*/
-	// newbucket->next = libraryFunctionsMap[hashindex];
-	// libraryFunctionsMap[hashindex] = newbucket;
-	struct libraryfuncMap *newbucket = (struct libraryfuncMap *)malloc(sizeof(struct libraryfuncMap));
-	newbucket->id = strdup(id);
-	newbucket->address = addr;
-	libraryFunctionsMap[0]=newbucket;
-}
-
-
-void execute_not(struct instruction* instr){}
-void execute_uminus(struct instruction* instr){}
-void execute_and(struct instruction* instr){}
-void execute_or(struct instruction* instr){}
-void execute_jne(struct instruction* instr){}
-void execute_jge(struct instruction* instr){}
-void execute_jlt(struct instruction* instr){}
-void execute_jle(struct instruction* instr){}
-void execute_jump(struct instruction* instr){}
-void execute_jgt(struct instruction* instr){}
-void execute_nop(struct instruction* instr){}
-
-char* number_tostring(struct avm_memcell* m){
-	char *buff;buff = malloc(sizeof(m->data.numVal));
-	memset(buff,'\0',sizeof(buff));
-	sprintf(buff,"%f",m->data.numVal);
-	return buff;
-}
-char* string_tostring(struct avm_memcell* m){
-	return m->data.strVal;
-}
-char* bool_tostring(struct avm_memcell* m){
-	char *buff;buff = malloc(sizeof(m->data.boolVal));
-	memset(buff,'\0',sizeof(buff));
-	sprintf(buff,"%c",m->data.boolVal);
-	return buff;
-}
-char* table_tostring(struct avm_memcell* m){}
-char* userfunc_tostring(struct avm_memcell* m){}
-char* libfunc_tostring(struct avm_memcell* m){}
-char* nil_tostring(struct avm_memcell* m){}
-char* undef_tostring(struct avm_memcell* m){}
-
-
-
-void printDouble(double x){
-	double z;
-	int y;
-    y = (int)x;
-   	z = (x-y);
-   	if(z == 0)
-       	printf("%.f\t",x);
-   	else
-       	printf("%f\t",x);
-}
-void printNumTable(){
-	unsigned int index;
-	puts("****************** NUM_TABLE Start ******************");
-	for(index=0;index<totalNumConsts;index++){
-		printf("%d|\t",index);printDouble(numConsts[index]);printf("\n");
-	}
-	puts("------------------ NUM_TABLE End ------------------");
-}
-void printUserfuncTable(){
-	unsigned int index;
-	puts("****************** USERFUNC_TABLE Start ******************");
-	for(index=0;index<totalUserFuncs;index++){
-		printf("%d|\t%s\n",index,(userFuncs[index].id));
-	}
-	puts("------------------ USERFUNC_TABLE End ------------------");
 }
 
 void main(void){

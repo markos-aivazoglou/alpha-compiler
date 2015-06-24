@@ -7,6 +7,10 @@
 #define execute_mul execute_arithmetic
 #define execute_div execute_arithmetic
 #define execute_mod execute_arithmetic
+#define execute_jle	execute_comparative
+#define execute_jge execute_comparative
+#define execute_jgt execute_comparative
+#define execute_jlt execute_comparative
 #define AVM_STACKENV_SIZE 4
 #define AVM_MAX_INSTRUCTIONS  (unsigned) nop_v
 #define AVM_ENDING_PC  codeSize
@@ -234,6 +238,20 @@ arithmetic_func_t arithmeticFuncs[]={
 	mod_impl
 };
 
+typedef int(*cmp_func)(double,double);
+char cmp_gt(double x, double y);
+char cmp_ge(double x, double y);
+char cmp_lt(double x, double y);
+char cmp_le(double x, double y);
+void execute_comparative(struct instruction* instr);
+cmp_func comparisonFuncs[] = {
+	cmp_le,
+	cmp_ge,
+	cmp_lt,
+	cmp_gt,
+};
+
+
 typedef unsigned char (*tobool_func_t)(struct avm_memcell*);
 unsigned char number_tobool (struct avm_memcell* m);
 unsigned char string_tobool (struct avm_memcell* m);
@@ -266,6 +284,11 @@ char* typeStrings[]={
 	"undef"
 };
 
+
+
+
+
+
 struct avm_table;
 struct instruction*	code = (struct instruction*) 0;
 unsigned char 		executionFinished = 0;
@@ -273,7 +296,7 @@ unsigned int		pc = 0;
 unsigned int		currLine = 0;
 unsigned int		codeSize = 0;
 unsigned int		totalActuals = 0; //refering to calling functions
-// struct userfunc* funcInfo = avm_getfuncinfo(pc);
+
 struct avm_memcell ax, bx, cx;
 struct avm_memcell retval;
 unsigned int top, topsp;
@@ -312,7 +335,8 @@ void avm_memcellclear(struct avm_memcell* m);
 void  avm_tablebucketsdestroy(struct avm_table_bucket** p);
 unsigned avm_get_envvalue (unsigned int i);
 void libfunc_print(void);
-
+void libfunc_typeof(void);
+void libfunc_totalarguments(void);
 void avm_readbinary(void);
 void printDouble();
 void printNumTable();

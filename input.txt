@@ -1,11 +1,13 @@
 
-a = 1865;
+a = 5;
 b=23;
-if(a>10){
-	b=3;
+c = a+b;
+function f1(){
+	print(5);
+	return 5;
 }
-else{
-	b=5;
+function f2(){
+	print(3);
 }
-c=4;
-print(b,a,c);
+f(1);
+print(a,b);

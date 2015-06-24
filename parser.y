@@ -81,7 +81,7 @@ program : stmts
 ;
 
 
-stmts : stmt				{$$ = (expr*)malloc(sizeof(expr));$$=$1;puts("STMT");}
+stmts : stmt				{$$ = (expr*)malloc(sizeof(expr));$$=$1;}
 	| stmts stmt			{$$ = (expr*)malloc(sizeof(expr));$$=$2;
 					if($1->breaklist){$$->breaklist = merge($1->breaklist,$2->breaklist);}
 					if($1->conlist){$$->conlist = merge($1->conlist,$2->conlist);}
@@ -89,16 +89,16 @@ stmts : stmt				{$$ = (expr*)malloc(sizeof(expr));$$=$1;puts("STMT");}
 ;
 
 
-stmt : expr SEMICOLON 		{$$=$1;resetTemp();printf("some expression\n");}
-	| ifstmt			{$$=$1;resetTemp();printf("IF statement\n");}
-	| while 			{$$=$1;resetTemp();printf("While statement\n");}
-	| for   			{$$=$1;resetTemp();printf("For statement\n");}
-	| returnstmt 		{$$=(expr*)malloc(sizeof(expr));$$=$1;resetTemp();printf("Return statement\n");}
-	| block 			{$$=$1;resetTemp();printf("in BLOCK\n");}
-	| funcdef 			{$$=lvalue_expr($1->sym);resetTemp();printf("function definition\n");/*funcflag--;*/}
-	| break 			{$$=(expr*)malloc(sizeof(expr));$$=$1;resetTemp();printf("BREAK\n");}
-	| continue 			{$$=(expr*)malloc(sizeof(expr));$$=$1;resetTemp();printf("CONTINUE\n");}
-	| SEMICOLON			{$$=(expr*)malloc(sizeof(expr));resetTemp();printf("SEMICOLON\n");}
+stmt : expr SEMICOLON 		{$$=$1;resetTemp();}
+	| ifstmt			{$$=$1;resetTemp();}
+	| while 			{$$=$1;resetTemp();}
+	| for   			{$$=$1;resetTemp();}
+	| returnstmt 		{$$=(expr*)malloc(sizeof(expr));$$=$1;resetTemp();}
+	| block 			{$$=$1;resetTemp();}
+	| funcdef 			{$$=lvalue_expr($1->sym);resetTemp();/*funcflag--;*/}
+	| break 			{$$=(expr*)malloc(sizeof(expr));$$=$1;resetTemp();}
+	| continue 			{$$=(expr*)malloc(sizeof(expr));$$=$1;resetTemp();}
+	| SEMICOLON			{$$=(expr*)malloc(sizeof(expr));resetTemp();}
 	
 	;
 break : BREAK SEMICOLON
@@ -125,19 +125,19 @@ continue : CONTINUE SEMICOLON
 			else{puts("error : NOT IN LOOP");}}else puts("Cannot use continue without a loop ERROR.");
 }
 ;	
-expr : assignexpr  			{$$=$1;printf("assignment expression\n");}
-	| term				{$$=$1;printf("term\n");}
-	| expr PLUS expr 		{$$=op_expr(Table,add,$1,$3);printf("expr + expr\n");}
-	| expr MINUS expr 		{$$=op_expr(Table,sub,$1,$3);printf("expr - expr\n");}
-	| expr MULTI expr 		{$$=op_expr(Table,mul,$1,$3);printf("expr * expr\n");}
-	| expr DIV expr		{$$=op_expr(Table,divi,$1,$3);printf("expr / expr\n");}
-	| expr MOD expr 		{$$=op_expr(Table,mod,$1,$3);printf("expr MOD expr\n");}
-	| expr GREATER expr 		{$$=bool_expr(Table,if_greater,$1,$3);printf("expr > expr\n");}
-	| expr GREATEROREQ expr 	{$$=bool_expr(Table,if_greatereq,$1,$3);printf("expr >= expr\n");}
-	| expr LESS expr 		{$$=bool_expr(Table,if_less,$1,$3);printf("expr < expr\n");}
-	| expr LESSOREQ expr 	{$$=bool_expr(Table,if_lesseq,$1,$3);printf("expr <= expr\n");}	
-	| expr EQUAL expr		{$$=bool_expr(Table,if_eq,$1,$3);printf("expr == expr\n");} 
-	| expr NEQUAL expr 		{$$=bool_expr(Table,if_noteq,$1,$3);printf("expr != expr\n");}
+expr : assignexpr  			{$$=$1;}
+	| term				{$$=$1;}
+	| expr PLUS expr 		{$$=op_expr(Table,add,$1,$3);}
+	| expr MINUS expr 		{$$=op_expr(Table,sub,$1,$3);}
+	| expr MULTI expr 		{$$=op_expr(Table,mul,$1,$3);}
+	| expr DIV expr		{$$=op_expr(Table,divi,$1,$3);}
+	| expr MOD expr 		{$$=op_expr(Table,mod,$1,$3);}
+	| expr GREATER expr 		{$$=bool_expr(Table,if_greater,$1,$3);}
+	| expr GREATEROREQ expr 	{$$=bool_expr(Table,if_greatereq,$1,$3);}
+	| expr LESS expr 		{$$=bool_expr(Table,if_less,$1,$3);}
+	| expr LESSOREQ expr 	{$$=bool_expr(Table,if_lesseq,$1,$3);}	
+	| expr EQUAL expr		{$$=bool_expr(Table,if_eq,$1,$3);} 
+	| expr NEQUAL expr 		{$$=bool_expr(Table,if_noteq,$1,$3);}
 	| expr AND expr		{$$=$3;
 						if($1 && $3 && $1->type!=5){
 							$3->truelist = merge($1->falselist,$3->falselist);
@@ -323,8 +323,6 @@ assignexpr : lvalue ASSIGNMENT expr {
 			else{
 				emit(assign,$3,NULL,$1,-1,yylineno);
 				$$=newexpr(assignexpr_e);
-				$$->sym = newtemp(Table);
-				emit(assign,$1,NULL,$$,-1,yylineno);
 			}
 			if(!$1->sym){
 				printf("Den uparxei symbol    ERROR\n");
@@ -335,20 +333,18 @@ assignexpr : lvalue ASSIGNMENT expr {
 			temp = lookUpScope(Table,val,USERFUNC,scope);
 			if(temp){
 				if(temp->type==USERFUNC)printf("ERROR\n");
-				else{
-					printf("Result of assign : %s \n",$1->sym->name);
-				}
+				
 			}
 		}
 ;
 
-primary : call			{$$=$1;flag1=0;printf("call \n");}
-	| lvalue			{$$ = emit_iftableitem($1);printf("lvalue \n");}	
-	| objectdef			{printf("object definition \n");$$ = $1;}
+primary : call			{$$=$1;flag1=0;}
+	| lvalue			{$$ = emit_iftableitem($1);}	
+	| objectdef			{$$ = $1;}
 	| LPAR funcdef RPAR 		{$$ = newexpr(programfunc_e);
 					 $$->sym = $2->sym;
-					 printf("(function definition) \n");}
-	| const			{$$=$1; printf("constant \n");}
+					 }
+	| const			{$$=$1;}
 ;	
 
 lvalue : ID				{		
@@ -471,25 +467,26 @@ lvalue : ID				{
 							else{
 								printf("Global variable %s found\n",val);
 							}
-						$$=lvalue_expr(temp->sym);
-						printf("::id \n");}
+							$$=lvalue_expr(temp->sym);
+							printf("::id \n");
+						}
 					}
-	| member			{$$=$1;printf("member \n");
+	| member			{
+						$$=$1;printf("member \n");
 					}
 ;
 
 	
 member : lvalue FULLSTOP ID		{
 					$$ = member_item($1,$3);
-					printf("lvalue.id \n");}
+				}
 	| lvalue LTAB expr RTAB	{
 					$1 = emit_iftableitem($1);
 					$$ = newexpr(tableitem_e);
 					$$->sym = $1->sym;
-					$$->index = $3;
-					printf("lvalue[expression] \n");}
+					$$->index = $3;}
 	| call FULLSTOP ID		{
-					printf("call.id \n");}
+					printf("NEEDS TO BE COMPLETEEED \n");}
 	| call LTAB expr RTAB	{
 					printf("call [expression]\n");}
 ;	
@@ -497,7 +494,7 @@ member : lvalue FULLSTOP ID		{
 
 
 call : call LPAR elist RPAR		{$$ = make_call($$,$3);
-					printf("call (elist)\n");}
+					}
 	
 	| lvalue{const char *  val;val=$1->sym->name;
 			int i = scope;
@@ -521,7 +518,6 @@ call : call LPAR elist RPAR		{$$ = make_call($$,$3);
 			}	
 	} callsuffix { if($3->method == 1 && $3->elist){
 			expr* self = $1;
-			puts("elist in callsufix exists");
 			$1 = emit_iftableitem(member_item(self,$3->name));//TODO : ADD FRONT
 			$3->elist->next = (expr*)malloc(sizeof(expr*));
 			$3->elist->next = self;
@@ -533,15 +529,12 @@ call : call LPAR elist RPAR		{$$ = make_call($$,$3);
 							func = newexpr(programfunc_e);
 							func->sym = $2->sym;
 							$2 = make_call(func,$5);
-							
-
-
-							printf("(function definition) (elist)\n");}
+							}
 ;	
 
 
-callsuffix : normcall		{$$=$1;printf("normal call \n");}
-	| methodcall			{$$=$1;printf("method call \n");}
+callsuffix : normcall		{$$=$1;}
+	| methodcall			{$$=$1;}
 ;	
 
 
@@ -549,7 +542,7 @@ normcall : LPAR elist RPAR 		{
 					$$->elist = $2;
 					$$->method = 0;
 					$$->name = "";
-					printf("(elist) \n");}
+				}
 ;
 
 
@@ -557,7 +550,7 @@ methodcall : DOTDOT ID LPAR elist RPAR		{
 		$$->elist = $4;
 		$$->method = 1;
 		$$->name = $2;
-		printf("..id (elist) \n");}
+	}
 ;
 
 
@@ -584,23 +577,14 @@ elist :  expr elist2	{
 						temp2->next = $1;
 						$1->next = NULL;
 						$$ = reverse($2);
-						puts("ELIST1 DONE");
 					}
-					
-				
-			
-					
-
-
-				printf("expression \n");}
-	|/*empty*/	{$$ = (expr*)malloc(sizeof(expr));$$=NULL;puts("EMPTY ELIST");}
+				}
+	|/*empty*/	{$$ = (expr*)malloc(sizeof(expr));$$=NULL;}
 ;
 
 
 elist2 : COMMA expr elist2		{expr * temp=NULL;
 					temp = $3;
-					
-					if($2->type == constnum_e || $2->type==var_e){printf("             %f\n",$2->numConst);}
 					if(temp){
 						while(temp->next){
 							temp = temp->next;
@@ -611,8 +595,8 @@ elist2 : COMMA expr elist2		{expr * temp=NULL;
 					else{
 						$$=$2;
 					}
-					 	printf(",expression\n");} 
-	|/*empty*/{puts("EMPTY ELIST2");$$=NULL;}
+				}
+	|/*empty*/{$$=NULL;}
 	
 objectdef : objectdef1	{$$=$1;}
 		|objectdef2   {$$=$1;}
@@ -691,7 +675,7 @@ indexed2 : COMMA indexedelem indexed2	{
 						$$->next = NULL;
 					}
 }
-	| /*empty*/ 			{/*$$=(expr*)malloc(sizeof(expr));*/$$=NULL;}
+	| /*empty*/ 			{$$=NULL;}
 ;
 
 

@@ -344,7 +344,6 @@ expr* make_call(expr* lvalue,expr* elist){
 	func = emit_iftableitem(lvalue);
 	
 	if(elist!=NULL){
-	puts("MAKE CALL");
 	elist = reverse(elist);
 	}
 	while(elist){
@@ -390,9 +389,9 @@ char * newTempName(){
 struct symbol * newtemp(symTable Table){
 	SymbolTableEntry* entry = NULL;
 	char * name = newTempName();
-	//printf("phra to %s name\n",name);
 	entry = lookUpScope(Table,name,LOCALS,currScope());
 	if(entry){
+		printf("newTemp:%s\n",entry->sym->name);
 		return entry->sym;
 	}
 	else{
