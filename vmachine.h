@@ -14,6 +14,7 @@
 #define AVM_STACKENV_SIZE 4
 #define AVM_MAX_INSTRUCTIONS  (unsigned) nop_v
 #define AVM_ENDING_PC  codeSize
+
 #define AVM_NUMACTUALS_OFFSET	+4
 #define AVM_SAVEDPC_OFFSET		+3
 #define AVM_SAVEDTOP_OFFSET		+2
@@ -87,15 +88,32 @@ enum vmarg_t{
 };
 
 enum vmopcode{
-	assign_v,		add_v,			sub_v,
-	mul_v,			div_v,			mod_v,
-	uminus_v,		and_v,			or_v,
-	not_v,			jump_v,			jeq_v,		jne_v,
-	jle_v,			jge_v,			jlt_v,
-	jgt_v,			call_v,			pusharg_v,
-	funcenter_v,		funcexit_v,		newtable_v,
-	tablegetelem_v,		tablesetelem_v,		nop_v
-};	
+	assign_v=0,
+	add_v=1,			
+	sub_v=2,
+	mul_v=3,			
+	div_v=4,			
+	mod_v=5,
+	uminus_v=6,
+	and_v=7,			
+	or_v=8,
+	not_v=9,			
+	jump_v=10,			
+	jeq_v=11,		
+	jne_v=12,
+	jle_v=13,			
+	jge_v=14,			
+	jlt_v=15,
+	jgt_v=16,			
+	call_v=17,			
+	pusharg_v=18,
+	funcenter_v=19,		
+	funcexit_v=20,		
+	newtable_v=21,
+	tablegetelem_v=22,		
+	tablesetelem_v=23,		
+	nop_v=24
+};		
 
 struct vmarg{
 	enum vmarg_t type;

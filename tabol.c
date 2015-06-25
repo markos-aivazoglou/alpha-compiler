@@ -1,3 +1,4 @@
+
 #include "tabol.h"
 
 static unsigned int makeHash(const char *value){

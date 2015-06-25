@@ -55,8 +55,7 @@ struct avm_memcell* avm_translate_operand (struct vmarg* arg,struct avm_memcell*
 		case nil_a: reg->type = nil_m; return reg;
 		case userfunc_a:{
 			reg->type = userfunc_m;
-			printf("user arg val:%d\n",arg->val);
-			reg->data.funcVal = arg->val;
+			reg->data.funcVal = userFuncs[arg->val].address;
 			return reg;
 		}
 		case libfunc_a:{
@@ -78,6 +77,7 @@ void execute_cycle(void){
 		return;
 		}
 	else{
+		printf("pc:%d\n",pc);
 		assert(pc < AVM_ENDING_PC);
 		struct instruction* instr = code + pc;
 		assert(
@@ -87,8 +87,8 @@ void execute_cycle(void){
 		if(instr->srcLine)
 			currLine = instr->srcLine;
 		unsigned oldPC = pc;
-		// printf("pc:%d\n",pc);
 		(*executeFuncs[instr->opcode])(instr);
+		// printf("pc:%d\n",pc);
 		if(pc == oldPC)
 			++pc;
 	}
@@ -121,7 +121,10 @@ extern void memclear_table(struct avm_memcell* m){
 void execute_assign (struct instruction* instr) {
 	struct avm_memcell* lv = avm_translate_operand(&instr->result,(struct avm_memcell*) 0);
 	struct avm_memcell* rm = avm_translate_operand(&instr->arg1,&ax);
-	assert(lv && ( &stack[topsp-1] >= lv && lv > &stack[top] || lv == &retval));
+	assert(lv);
+	assert(&stack[AVM_STACKSIZE-1] >= lv);
+	assert(lv > &stack[top]);
+	assert(lv && ( &stack[AVM_STACKSIZE-1] >= lv && lv > &stack[top] || lv == &retval));
 	assert(rm);
 	avm_assign(lv,rm);
 }
@@ -196,12 +199,13 @@ void avm_dec_top (void){   //CALLING FUNCTIONS
 
 void avm_push_envvalue(unsigned int val) {
 	stack[top].type = number_m;
-	stack[top].data.numVal = val;
+	stack[top].data.numVal = (double)val;
 	avm_dec_top();
 }
 
 void avm_callsaveenvironment (void){
 	avm_push_envvalue(totalActuals);
+	printf("pc on push:%d\n",pc);
 	avm_push_envvalue(pc+1);
 	avm_push_envvalue(top + totalActuals +2);
 	avm_push_envvalue(topsp);
@@ -211,7 +215,7 @@ void avm_callsaveenvironment (void){
 void execute_funcenter (struct instruction* instr){
 		struct avm_memcell* func = avm_translate_operand(&instr->result,&ax);
 		assert(func);
-		printf("funcval:%d\n",func->data.funcVal);
+		printf("pc on enter:%d\n",pc);
 		assert(pc == func->data.funcVal); /*  func address should match pc*/
 		/* Callee actions here */
 		totalActuals = 0;
@@ -229,10 +233,11 @@ unsigned int avm_get_envvalue (unsigned int i) {
 
 void execute_funcexit(struct instruction* unused) {				/* Epanafora prohgoumenou perivallontos,kai epistrofh apo thn klhsh */
 	unsigned int oldTop = top;
-	top = 		avm_get_envvalue(topsp + AVM_SAVEDTOP_OFFSET);
+	printf("topsp dunno:%d\n",topsp);
 	pc = 		avm_get_envvalue(topsp + AVM_SAVEDPC_OFFSET);
+	top = 		avm_get_envvalue(topsp + AVM_SAVEDTOP_OFFSET);
 	topsp = 	avm_get_envvalue(topsp + AVM_SAVEDTOPSP_OFFSET);
-	
+	printf("pc on exit:%d\n",pc); //FUCKED UP GIATI DEN EXEI PATCHED TO JUMP THS SUNARTHSHS
 	while(oldTop++ <= top) /* Intentionally ignoring first*/     /* GARBADGE COLLECTION */
 		avm_memcellclear(&stack[oldTop]);
 }
@@ -255,9 +260,14 @@ void avm_calllibfunc(char* id) {
 
 
 struct userfunc* avm_getfuncinfo(unsigned int index){
-
-	assert(index < totalUserFuncs);
-	return &userFuncs[index];
+	// printf("ind:%d\ttotaluser:%d\n",index,totalUserFuncs);
+	int i;
+	for(i=0;i<totalUserFuncs;i++){
+		if(index == userFuncs[i].address){
+			return &userFuncs[i];
+		}
+	}
+	// assert(index < totalUserFuncs);
 }
 unsigned int avm_totalactuals(void){
 	return avm_get_envvalue(topsp + AVM_NUMACTUALS_OFFSET);
@@ -314,7 +324,7 @@ void execute_arithmetic(struct instruction* instr){
 	struct avm_memcell* rv1 = avm_translate_operand(&instr->arg1, &ax);
 	struct avm_memcell* rv2 = avm_translate_operand(&instr->arg2, &bx);
 	
-	assert(lv && (&stack[topsp-1] >=lv && lv > &stack[top] || lv==&retval));
+	assert(lv && (&stack[AVM_STACKSIZE-1] >=lv && lv > &stack[top] || lv==&retval));
 	assert(rv1 && rv2);
 	
 	if(rv1->type != number_m || rv2->type != number_m){
@@ -452,7 +462,6 @@ void execute_jne(struct instruction* instr){
 		/* Equality check with dispatching. */
 		switch(rv1->type){
 			case number_m:{
-				puts("FUCKFUCK");
 				result= rv1->data.numVal != rv2->data.numVal;
 				break;
 			}
@@ -543,7 +552,7 @@ void execute_jump(struct instruction* instr){
 /* TABLES*/
 void execute_newtable(struct instruction* instr){         
 	struct avm_memcell* lv = avm_translate_operand(&instr->arg1, (struct avm_memcell*)0);
-	assert(lv && (&stack[topsp-1] >=lv && &stack[top] < lv || lv == &retval));
+	assert(lv && (&stack[AVM_STACKSIZE-1] >=lv && &stack[top] < lv || lv == &retval));
 	avm_memcellclear(lv);
 	
 	lv->type = table_m;
@@ -556,8 +565,8 @@ void execute_tablegetelem(struct instruction* instr){
 	struct avm_memcell* lv = avm_translate_operand(&instr->result,(struct avm_memcell*)0);
 	struct avm_memcell* t = avm_translate_operand(&instr->arg1,(struct avm_memcell*)0);
 	struct avm_memcell* i = avm_translate_operand(&instr->arg2, &ax);
-	assert(lv && (&stack[topsp-1] >= lv && &stack[top] < lv || lv == &retval));
-	assert(t && &stack[topsp-1] >= t && &stack[top] < t);
+	assert(lv && (&stack[AVM_STACKSIZE-1] >= lv && &stack[top] < lv || lv == &retval));
+	assert(t && &stack[AVM_STACKSIZE-1] >= t && &stack[top] < t);
 	assert(i);
 	
 	avm_memcellclear(lv);
@@ -595,7 +604,7 @@ void execute_tablesetelem(struct instruction* instr){
 
 static void avm_initstack(void){
 	unsigned int i;
-	for(i=0; i<AVM_STACKSIZE; ++i){
+	for(i=0; i<AVM_STACKSIZE; i++){
 		AVM_WIPEOUT(stack[i]);
 		stack[i].type = undef_m;
 	}
@@ -607,6 +616,7 @@ void avm_initialize(void) {
 	avm_readbinary();
 	avm_initstack();
 	top = AVM_STACKSIZE - 1 - globalvars;
+	topsp = top;
 	avm_registerlibfunc("print",libfunc_print);
 	avm_registerlibfunc("typeof",libfunc_typeof);
 	avm_registerlibfunc("totalarguments",libfunc_totalarguments);
@@ -618,9 +628,8 @@ void avm_initialize(void) {
 }
 void libfunc_print(void){
 	unsigned int n = avm_totalactuals();
-	// printf("total this time %d\n",n);
 	unsigned int i;
-	for(i = 0;i<n;i++){/*GIATI TOTAL ACTUALS 3*/
+	for(i = 0;i<n;i++){
 		char* s = strdup(avm_tostring(avm_getactual(i)));
 		puts(s);
 		free(s);
@@ -830,6 +839,7 @@ void avm_readbinary(void){
 	}
 	fscanf(fp,"%s",buf);//Table name
 	fscanf(fp,"%s",buf);//STR Contents
+
 	i = atoi(buf);
 	totalStrConsts = i;
 	/*read string table*/
@@ -840,6 +850,7 @@ void avm_readbinary(void){
 	}
 	fscanf(fp,"%s",buf);//Table name
 	/*read num table*/
+	int test;
 	fscanf(fp,"%s",buf);//Num Contents
 	i = atoi(buf);
 	totalNumConsts = i;
@@ -855,6 +866,11 @@ void avm_readbinary(void){
 	userFuncs = (struct userfunc*)malloc(sizeof(struct userfunc)*totalUserFuncs);
 	/*read user funcs table*/
 	for(j=0;j<i;j++){
+	    fscanf(fp,"%s",buf);
+	    // printf("addr:%s\n",buf);
+	    userFuncs[j].address = atoi(buf);
+	    fscanf(fp,"%s",buf);
+	    userFuncs[j].localSize = atoi(buf);
 	    fscanf(fp,"%s",buf);
 	    userFuncs[j].id = strdup(buf);
 	}

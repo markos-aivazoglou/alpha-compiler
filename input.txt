@@ -1,13 +1,15 @@
 
 a = 5;
-b=23;
+b=126;
 c = a+b;
+// print(c);
 function f1(){
+	j=3;
 	print(5);
-	return 5;
+	return a+b;
 }
-function f2(){
-	print(3);
-}
-f(1);
+f1();
 print(a,b);
+// function f2(){
+// 	print(3);
+// }

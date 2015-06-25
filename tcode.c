@@ -395,6 +395,8 @@ unsigned int userfuncs_newfunc(struct symbol* sym){
 	}
 	(userFuncs+totalUserFuncs)->address = sym->taddress;
 	(userFuncs+totalUserFuncs)->id = sym->name;
+	printf("totallocals:%d\n",sym->totallocals);
+	(userFuncs+totalUserFuncs)->localSize = sym->totallocals;
 	//TODO init localsize.
 	return totalUserFuncs;
 }
@@ -651,6 +653,20 @@ void generate_GETRETVAL(quad* quad) {
 }
 
 void generate_FUNCSTART(quad* quad){
+	struct instruction t0;
+	t0.arg1.type = nil_a;
+	t0.arg2.type = nil_a;
+	t0.result.type= label_a;
+	t0.opcode = jump_v;
+	quad->label = nextinstructionlabel();
+	// printf("label:%d\n",(quads+quad->label)->taddress);
+	if (quad->label < currprocessedquad())
+		t0.result.val = (quads+quad->label)->taddress;
+	else{	
+		add_incomplete_jump(nextinstructionlabel(), quad->label);
+	}
+	// quad->taddress = nextinstructionlabel();
+	emit_instruction(&t0); /* TODO*/
 	struct userfunc* f;
 	f = (struct userfunc*)malloc(sizeof(struct userfunc));
 	f->id=quad->result->sym->name;
@@ -661,10 +677,10 @@ void generate_FUNCSTART(quad* quad){
 
 	(userFuncs+totalUserFuncs)->address = f->address;
 	(userFuncs+totalUserFuncs)->id = f->id;
-	(userFuncs+totalUserFuncs)->localSize = f->localSize;
+	(userFuncs+totalUserFuncs)->localSize = quad->result->sym->totallocals;
 	f->index = totalUserFuncs-1;
 	funcpush(f);
-	
+
 	struct instruction t;
 	totalUserFuncs++;
 	t.arg1.type = nil_a;
@@ -680,6 +696,7 @@ void generate_RETURN(quad* quad){
 	struct instruction t;
 	t.opcode = assign_v;
 	make_retvaloperand(&t.arg1);
+	t.arg2.type=nil_a;
 	make_operand(quad->result, &t.result);
 	emit_instruction(&t);
 	
@@ -701,7 +718,7 @@ void generate_FUNCEND(quad* quad){
 	struct userfunc* f;
 	f=funcpop(funcstack);
 	patch_returns(f->returnList, nextinstructionlabel());
-
+	// patch_incomplete_jumps(nextquadlabel(),currInstruction);
 	quad->taddress = nextinstructionlabel();
 	struct instruction t;
 	t.opcode = funcexit_v;
@@ -803,287 +820,236 @@ void printTables(){
 	printLibfuncTable();
 }
 void printTables_tofile(){
-  
-  
-	int i = open("target.txt",O_RDWR|O_CREAT,S_IRWXU);
 	unsigned int magicNumber=23522275;
-	char buf[8];
-	sprintf(buf,"%d",magicNumber);
-	write(i,buf,sizeof(buf));
-	write(i,"\n",1);
-	printStringTable_tofile(i);
-	printNumTable_tofile(i);
-	printUserfuncTable_tofile(i);
- 	printLibfuncTable_tofile(i);
- 	printInstructions_tofile(i);
-	close(i);
+	FILE* fp = fopen("target.txt","w+");
+	fprintf(fp,"%d\n",magicNumber);
+	printStringTable_tofile(fp);
+	printNumTable_tofile(fp);
+	printUserfuncTable_tofile(fp);
+ 	printLibfuncTable_tofile(fp);
+ 	printInstructions_tofile(fp);
+	fclose(fp);
+
 }
-void printStringTable_tofile(int j){
-	char buf[5];
-	char *buf2;
+void printStringTable_tofile(FILE* fp){
 	int i=0;
-	memset(buf,'\0',sizeof(buf));
-	sprintf(buf,"%d",totalStringConsts);
-	buf[strlen(buf)]='\0';
-	write(j,"strings ",8);
-	write(j,buf,strlen(buf));
-	write(j,"\n",1);
-	for(i;i<totalStringConsts;i++){
-	  buf2=strdup(stringConsts[i]);
-	  write(j,buf2,strlen(buf2));
-	  memset(buf2,'\0',sizeof(buf2));
-	  write(j,"\n",1);
+	fprintf(fp,"Strings\t%d\n",totalStringConsts );
+	for(i=0;i<totalStringConsts;i++){
+		fprintf(fp,"%s\n",stringConsts[i]);
 	}
   
   
 }
-void printNumTable_tofile(int j){
-	char buf[8];
+void printNumTable_tofile(FILE* fp){
 	int i=0;
-	memset(buf,'\0',sizeof(buf));
-	sprintf(buf,"%d",totalNumConsts);
-	buf[strlen(buf)]='\0';
-	
-	write(j,"constants ",10);
-	write(j,buf,strlen(buf));
-	write(j,"\n",1);
+	fprintf(fp,"Number_Constants %d\n",totalNumConsts);
 	double z;
 	int y;
 	double x;
-	memset(buf,'\0',sizeof(buf));
 	for(i=0;i<totalNumConsts;i++){
 	  x = numConsts[i];
 	  y = (int)x;
 	  z = (x-y);
 	  if(z == 0)
-               sprintf(buf,"%.f\t",x);
+               fprintf(fp,"%.f\t\n",x);
    	  else
-               sprintf(buf,"%.3f\t",x);
-	  buf[strlen(buf)]='\0';
-	  write(j,buf,strlen(buf));
-	  memset(buf,'\0',sizeof(buf));
-	  write(j,"\n",1);
-	  
+               fprintf(fp,"%.3f\t\n",x);	  
 	}
 }
 
-void printUserfuncTable_tofile(int i){
-	char buf1[3];
-	write(i,"User_Funcs ",11);
-	sprintf(buf1,"%d",totalUserFuncs);
-	write(i,buf1,strlen(buf1));
-	write(i,"\n",1);
-	unsigned int index;
-	char *buf;
+void printUserfuncTable_tofile(FILE* fp){
+	fprintf(fp,"User_Functions %d\n",totalUserFuncs);
+	int index;
 	for(index=0; index<totalUserFuncs; index++)
 	{
-		
-		buf = strdup(userFuncs[index].id);
-		write(i,buf,strlen(buf));
-		memset(buf,'\0',sizeof(buf));
-		write(i,"\n",1);
+		fprintf(fp,"%d\t%d\t%s\n",userFuncs[index].address,userFuncs[index].localSize,userFuncs[index].id);
 	}
 	
   
   
 }
 
-void printLibfuncTable_tofile(int i){
-	char buf1[3];
-	write(i,"Library_Funcs ",14);
-	sprintf(buf1,"%d",totalNamedLibfuncs);
-	write(i,buf1,strlen(buf1));
-	write(i,"\n",1);
+void printLibfuncTable_tofile(FILE* fp){
+	
+	
+	fprintf(fp,"Library_Functions %d\n",totalNamedLibfuncs);
 	unsigned int index,strsize;
-	char *buf;
 	for(index=0; index<totalNamedLibfuncs; index++)
 	{
-	  buf = strdup(namedLibfuncs[index]);
-	  write(i,buf,strlen(buf));
-	  memset(buf,'\0',sizeof(buf));
-	  write(i,"\n",1);
+	  fprintf(fp,"%s\n",namedLibfuncs[index]);
 	}
 	
 }
 
-void printInstructions_tofile(int j){
+void printInstructions_tofile(FILE* fp){
 	struct instruction* temp = NULL;
 	temp = instructions;
 	unsigned int i=0;
-	char buf3[4];
-	write(j,"total_instructions ",19);
-	memset(buf3,'\0',sizeof(buf3));
+	fprintf(fp,"total_instructions %d\n",currInstruction);
 	printf("total instr %d\n",currInstruction);
-	sprintf(buf3,"%d",currInstruction);
-	write(j,buf3,strlen(buf3));
-	write(j,"\n",1);
 	while(temp <= (instructions+nextinstructionlabel()-1)){
-		printInstrOp_tofile(temp->opcode,j);
+		printInstrOp_tofile(temp->opcode,fp);
 		if(&temp->arg1){
-			printVMarg_tofile(&temp->arg1,j);			
+			printVMarg_tofile(&temp->arg1,fp);			
 		}
 		if(&temp->arg2){
-			printVMarg_tofile(&temp->arg2,j);
+			printVMarg_tofile(&temp->arg2,fp);
 		}
 		if(&temp->result){
-			printVMarg_tofile(&temp->result,j);
+			printVMarg_tofile(&temp->result,fp);
 		}
 		i++;
 		temp = instructions+i;
-		write(j,"\n",1);
+		fprintf(fp,"\n");
 	}
 }
 
 
 
 
-void printVMarg_tofile(struct vmarg* arg,int i){ 
+void printVMarg_tofile(struct vmarg* arg,FILE* fp){ 
 		
-		char buf4[10];
-		memset(buf4,'\0',sizeof(buf4));
+		
 		switch(arg->type){
 		case label_a: 
-			      sprintf(buf4,"%d,%d\t\t\t",arg->type,arg->val);
-			      write(i,buf4,strlen(buf4));
+			      fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
+			      
 			      break; //	label_a
-		case global_a: 	sprintf(buf4,"%d,%d\t\t\t",arg->type,arg->val);
-				write(i,buf4,strlen(buf4));
+		case global_a: 	fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
+				
 				break; //	global_a
-		case formal_a:	sprintf(buf4,"%d,%d\t\t\t",arg->type,arg->val);
-				write(i,buf4,strlen(buf4)); 
+		case formal_a:	fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
+				 
 				break; //	formal_a
-		case local_a: 	sprintf(buf4,"%d,%d\t\t\t",arg->type,arg->val);
-				write(i,buf4,strlen(buf4));
+		case local_a: 	fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
+				
 				break; //	local_a
-		case number_a: 	sprintf(buf4,"%d,%d\t\t\t",arg->type,arg->val);
-				write(i,buf4,strlen(buf4));
+		case number_a: 	fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
+				
 				break; //	number_a
-		case string_a: 	sprintf(buf4,"%d,%d\t\t\t",arg->type,arg->val);
-				write(i,buf4,strlen(buf4));
+		case string_a: 	fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
+				
 				break; //	string_a
-		case bool_a: 	sprintf(buf4,"%d,%d\t\t\t",arg->type,arg->val);
-				write(i,buf4,strlen(buf4));
+		case bool_a: 	fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
+				
 				break; //	bool_a
-		case nil_a: 	sprintf(buf4,"%d\t\t\t",arg->type);
-				write(i,buf4,strlen(buf4));
+		case nil_a: 	fprintf(fp,"%d\t\t\t",arg->type);
+				
 				break; //nil_a
-		case userfunc_a: sprintf(buf4,"%d,%d\t\t\t",arg->type,arg->val);
-				  write(i,buf4,strlen(buf4));
+		case userfunc_a: fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
+				  
 				  break; //	userfunc_a
-		case libfunc_a:  sprintf(buf4,"%d,%d\t\t\t",arg->type,arg->val);
-				  write(i,buf4,strlen(buf4));
+		case libfunc_a:  fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
+				  
 				  break; //	libfunc_a
-		case retval_a: 	sprintf(buf4,"%d\t\t\t",arg->type);
-				write(i,buf4,strlen(buf4));
+		case retval_a: 	fprintf(fp,"%d\t\t\t",arg->type);
+				
 				break; //	retval_a
 		default: ;//printf("Asserting for arg->val=%d\n",arg->val);assert(0);
 	}
 }
 
-void printInstrOp_tofile(enum vmopcode op,int i){
-	char buf5[2];
-	memset(buf5,'\0',sizeof(buf5));
-	
+void printInstrOp_tofile(enum vmopcode op,FILE* fp){
 	switch(op){
 		case assign_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case add_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case sub_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case mul_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case div_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case mod_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case uminus_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case and_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case or_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case not_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case jump_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case jeq_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case jne_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case jle_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case jge_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case jlt_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case jgt_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case call_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case pusharg_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case funcenter_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case funcexit_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case newtable_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case tablegetelem_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case tablesetelem_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 		case nop_v:
-			sprintf(buf5,"%d\t\t",op);
-			write(i,buf5,strlen(buf5));
+			fprintf(fp,"%d\t\t",op);
+			
 			break;
 	}
 	
