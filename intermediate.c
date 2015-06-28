@@ -174,6 +174,7 @@ void emit(enum iopcode op,expr* arg1,expr* arg2,expr* result,unsigned int label,
 	p->label  = label;
 	p->line   = line;
 	p->op 	   = op;
+	// p->taddress = 0;
 	if(!arg1){
 		p->arg1 = (expr*)malloc(sizeof(expr));
 		p->arg1->type = nil_e;
@@ -347,6 +348,7 @@ expr* make_call(expr* lvalue,expr* elist){
 	elist = reverse(elist);
 	}
 	while(elist){
+		printf("elis:%d\n",elist->numConst);
 		emit(param,NULL,NULL,elist,-1,yylineno);
 		elist = elist->next;
 	}

@@ -2908,7 +2908,7 @@ temp->sym = sym;
 
   case 113:
 #line 1010 "parser.y" /* yacc.c:1646  */
-    {if(funcflag>0){(yyval.exprValue)=(expr*)malloc(sizeof(expr));(yyval.exprValue)=(yyvsp[0].exprValue);emit(ret,NULL,NULL,(yyvsp[0].exprValue),-1,yylineno);}else{printf("Cannot use return outside a function ERROR\n");}}
+    {if(funcflag>0){(yyval.exprValue)=(expr*)malloc(sizeof(expr));(yyval.exprValue)=(yyvsp[0].exprValue);emit(ret,(yyvsp[0].exprValue),NULL,NULL,-1,yylineno);}else{printf("Cannot use return outside a function ERROR\n");}}
 #line 2913 "parser.c" /* yacc.c:1646  */
     break;
 
@@ -3180,7 +3180,7 @@ int main(int argc, char **argv)
 		insert(Table,"objectmemberkeys",LIBFUNC,0,0);
 		insert(Table,"objecttotalmembers",LIBFUNC,0,0);
 		insert(Table,"objectcopy",LIBFUNC,0,0);
-		insert(Table,"totalarguements",LIBFUNC,0,0);
+		insert(Table,"totalarguments",LIBFUNC,0,0);
 		insert(Table,"arguement",LIBFUNC,0,0);
 		insert(Table,"typeof",LIBFUNC,0,0);
 		insert(Table,"strtonum",LIBFUNC,0,0);

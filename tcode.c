@@ -29,7 +29,8 @@ unsigned int		ij_total = 0;
 struct userfunc* funcstack=NULL; 
 int stack_size = 0;
 int stack_top =0;
-
+func_start* fstart = (func_start *)0;
+func_end* fend = (func_end*)0;
 unsigned int totalVars = 0;
 
 
@@ -99,137 +100,7 @@ void emit_instruction(struct instruction* t){
 }
 
 
-void printInstructions(){
-	struct instruction* temp = NULL;
-	temp = instructions;
-	unsigned int i=0;
-	printf("\n^^^^^^^^^^^^^ Start printing Instruction Table ^^^^^^^^^^^^^\n");
-	while(temp <= (instructions+nextinstructionlabel()-1)){
-		printf("%d:",i);
-		printInstrOp(temp->opcode);
-		if(&temp->arg1){
-			printVMarg(&temp->arg1);			
-		}
-		if(&temp->arg2){
-			printVMarg(&temp->arg2);
-		}
-		if(&temp->result){
-			printVMarg(&temp->result);
-		}
-		i++;
-		temp = instructions+i;
-		printf("\n");
-	}
-}
 
-
-
-
-void printVMarg(struct vmarg* arg){ 
-	switch(arg->type){
-		case label_a: printf("00, %d\t",arg->val);break; //	label_a
-		case global_a: printf("01, %d:\t",arg->val);printVar(arg->val);break; //global_a
-		case formal_a: printf("02, %d:\t",arg->val);printVar(arg->val);break; //formal_a
-		case local_a: printf("03, %d:\t",arg->val);printVar(arg->val);break; //	local_a
-		case number_a: printf("04, %d:\t",arg->val);printDouble(numConsts[arg->val]);break; //	number_a
-		case string_a: printf("05, %d:%s\t",arg->val, stringConsts[arg->val]);break; //	string_a
-		case bool_a: printf("06, %c\t",arg->val);break; //	bool_a
-		case nil_a: /*printf("\t(nil_a)\t");*/break; //nil_a
-		case userfunc_a: printf("08, %d:  %s\t",arg->val, userFuncs[arg->val].id);break; //	userfunc_a
-		case libfunc_a: printf("09, %d:  %s\t",arg->val, namedLibfuncs[arg->val]);break; //	libfunc_a
-		case retval_a: printf("10, retval\t");break; //	retval_a
-		default: ;//printf("Asserting for arg->val=%d\n",arg->val);assert(0);
-	}
-}
-void printDouble(double x){
-	double z;
-	int y;
-    y = (int)x;
-   	z = (x-y);
-   	if(z == 0)
-       	printf("%.f\t",x);
-   	else
-        printf("%f\t",x);
-}
-void printInstrOp(enum vmopcode op){
-	switch(op){
-		case assign_v:
-			printf("ASSIGN\t");
-			break;
-		case add_v:
-			printf("ADD\t\t");
-			break;
-		case sub_v:
-			printf("SUB\t\t");
-			break;
-		case mul_v:
-			printf("MUL\t\t");
-			break;
-		case div_v:
-			printf("DIV\t\t");
-			break;
-		case mod_v:
-			printf("MOD\t\t");
-			break;
-		case uminus_v:
-			printf("UMINUS\t");
-			break;
-		case and_v:
-			printf("AND");
-			break;
-		case or_v:
-			printf("OR");
-			break;
-		case not_v:
-			printf("NOT");
-			break;
-		case jump_v:
-			printf("JUMP\t\t");
-			break;
-		case jeq_v:
-			printf("Jump_If_Equal ");
-			break;
-		case jne_v:
-			printf("Jump_If_NOTEqual ");
-			break;
-		case jle_v:
-			printf("Jump_If_lessOREqual ");
-			break;
-		case jge_v:
-			printf("Jump_If_greaterOREqual ");
-			break;
-		case jlt_v:
-			printf("Jump_IFLESS\t");
-			break;
-		case jgt_v:
-			printf("Jump_IFGREATER ");
-			break;
-		case call_v:
-			printf("CALL\t\t");
-			break;
-		case pusharg_v:
-			printf("PUSHARG\t");
-			break;
-		case funcenter_v:
-			printf("FuncENTER\t");
-			break;
-		case funcexit_v:
-			printf("FuncEXIT\t");
-			break;
-		case newtable_v:
-			printf("NEWTABLE\t");
-			break;
-		case tablegetelem_v:
-			printf("tableGETelem\t");
-			break;
-		case tablesetelem_v:
-			printf("tableSETelem\t");
-			break;
-		case nop_v:
-			printf("NOP");
-			break;
-	}
-}
 
 void make_operand(expr* e,struct vmarg* arg){
 
@@ -395,7 +266,6 @@ unsigned int userfuncs_newfunc(struct symbol* sym){
 	}
 	(userFuncs+totalUserFuncs)->address = sym->taddress;
 	(userFuncs+totalUserFuncs)->id = sym->name;
-	printf("totallocals:%d\n",sym->totallocals);
 	(userFuncs+totalUserFuncs)->localSize = sym->totallocals;
 	//TODO init localsize.
 	return totalUserFuncs;
@@ -430,26 +300,6 @@ void make_retvaloperand(struct vmarg* arg){
 	arg->type = retval_a;
 }
 
-void add_incomplete_jump(unsigned instrNo, unsigned iaddress){
-	struct incomplete_jump* temp;
-	temp = ij_head;
-	if(!temp){
-		ij_head = (struct incomplete_jump*)malloc(sizeof(struct incomplete_jump));
-		ij_head->iaddress = iaddress;
-		ij_head->instrNo = instrNo;
-		ij_head->next = NULL;
-		temp = ij_head;
-	}
-	else{
-		while(temp->next){
-			temp = temp->next;
-		}
-		temp->next = (struct incomplete_jump*)malloc(sizeof(struct incomplete_jump));
-		temp = temp->next;
-		temp->iaddress = iaddress;
-		temp->instrNo = instrNo;
-	}
-}
 
 void generate_instr(enum vmopcode op,quad* quad){
 	struct instruction t;
@@ -501,7 +351,7 @@ void generate_relational (int op,quad* quad) {
 	else
 		add_incomplete_jump(nextinstructionlabel(), quad->label);
 	quad->taddress = nextinstructionlabel();
-	emit_instruction(&t); /* TODO*/
+	emit_instruction(&t);
 }
 
 
@@ -625,8 +475,6 @@ void generate_PARAM(quad* quad) {
 	t.arg2.type = nil_a;
 	t.opcode = pusharg_v;
 	make_operand(quad->result, &t.result);
-	// printf("GAMW XRISTO     %d\n",quad->arg1->type);
-	//printf("PUSHARG %d****\n",t.result.type);
 	emit_instruction(&t);
 }
 
@@ -638,8 +486,6 @@ void generate_CALL(quad* quad) {
 	t.arg1.type = nil_a;
 	t.arg2.type = nil_a;
 	make_operand(quad->result, &t.result);
-	// printf("CALL %d****%d\n",t.result.type,t.result.val);
-
 	emit_instruction(&t);
 }
 
@@ -657,21 +503,17 @@ void generate_FUNCSTART(quad* quad){
 	t0.arg1.type = nil_a;
 	t0.arg2.type = nil_a;
 	t0.result.type= label_a;
+	t0.result.val = 0;
 	t0.opcode = jump_v;
-	quad->label = nextinstructionlabel();
-	// printf("label:%d\n",(quads+quad->label)->taddress);
-	if (quad->label < currprocessedquad())
-		t0.result.val = (quads+quad->label)->taddress;
-	else{	
-		add_incomplete_jump(nextinstructionlabel(), quad->label);
-	}
-	// quad->taddress = nextinstructionlabel();
-	emit_instruction(&t0); /* TODO*/
+	add_func_jump(nextinstructionlabel());
+	emit_instruction(&t0);
+	
+
+
 	struct userfunc* f;
 	f = (struct userfunc*)malloc(sizeof(struct userfunc));
 	f->id=quad->result->sym->name;
 	f->address = nextinstructionlabel();
-	
 	quad->taddress = nextinstructionlabel();
 	userfuncs_newfunc(quad->result->sym);	//added 6/5 ore
 
@@ -695,9 +537,9 @@ void generate_RETURN(quad* quad){
 	quad->taddress = nextinstructionlabel();
 	struct instruction t;
 	t.opcode = assign_v;
-	make_retvaloperand(&t.arg1);
+	make_retvaloperand(&t.result);
 	t.arg2.type=nil_a;
-	make_operand(quad->result, &t.result);
+	make_operand(quad->arg1, &t.arg1);
 	emit_instruction(&t);
 	
 	struct userfunc* f;
@@ -718,7 +560,6 @@ void generate_FUNCEND(quad* quad){
 	struct userfunc* f;
 	f=funcpop(funcstack);
 	patch_returns(f->returnList, nextinstructionlabel());
-	// patch_incomplete_jumps(nextquadlabel(),currInstruction);
 	quad->taddress = nextinstructionlabel();
 	struct instruction t;
 	t.opcode = funcexit_v;
@@ -726,6 +567,7 @@ void generate_FUNCEND(quad* quad){
 	t.arg2.type = nil_a;
 	make_operand(quad->result, &t.result);
 	t.result.val = f->index;
+	patch_func_jump(quad->taddress);
 	emit_instruction(&t);
 }
 
@@ -753,6 +595,56 @@ void patch_returns(struct userfunc* head, unsigned int instrNo){
   }
 }
 
+void add_func_jump(unsigned int instrNo){
+	func_start* temp;
+	temp = fstart;
+	if(!temp){
+		fstart = (struct func_start*)malloc(sizeof(struct func_start));
+		fstart->instrNo = instrNo;
+		fstart->next = NULL;
+		temp = fstart;
+	}
+	else{
+		while(temp->next){
+			temp = temp->next;
+		}
+		temp->next = (struct func_start*)malloc(sizeof(struct func_start));
+		temp = temp->next;
+		temp->instrNo = instrNo;
+		printf("insinf:%d\n",instrNo);
+	}
+}
+void patch_func_jump(unsigned int i){
+	
+	func_start* temp;
+	temp = fstart;
+	while(temp->next){
+			temp = temp->next;
+	}
+	
+	(instructions+temp->instrNo)->result.val = i+1;
+	free(temp);
+}
+void add_incomplete_jump(unsigned instrNo, unsigned iaddress){
+	struct incomplete_jump* temp;
+	temp = ij_head;
+	if(!temp){
+		ij_head = (struct incomplete_jump*)malloc(sizeof(struct incomplete_jump));
+		ij_head->instrNo = instrNo;
+		ij_head->iaddress = iaddress;
+		ij_head->next = NULL;
+		temp = ij_head;
+	}
+	else{
+		while(temp->next){
+			temp = temp->next;
+		}
+		temp->next = (struct incomplete_jump*)malloc(sizeof(struct incomplete_jump));
+		temp = temp->next;
+		temp->instrNo = instrNo;
+		temp->iaddress = iaddress;
+	}
+}
 void patch_incomplete_jumps(unsigned int intermediate_code_size,unsigned int target_code_size){    /* Check code place */
 	if(ij_head){
 	while(ij_head){
@@ -760,6 +652,8 @@ void patch_incomplete_jumps(unsigned int intermediate_code_size,unsigned int tar
 			(instructions+(ij_head->instrNo))->result.val = target_code_size;
 		}
 		else
+			// printf("res:%d\n",ij_head->instrNo);
+			// printf("res2:%d\n",(instructions+(ij_head->instrNo))->result.type);
 			(instructions+(ij_head->instrNo))->result.val = (quads+ij_head->iaddress)->taddress;
 		ij_head = ij_head->next;
 		}
@@ -797,6 +691,8 @@ struct userfunc* functop(){
 	return (funcstack+(stack_top-1));
 }
 
+
+/*<---------------------------------------- Print code start here-------------------------------------->*/
 void printVar(unsigned int offset){
 	struct var_table* temp = NULL;
 	temp = varhead;
@@ -1055,7 +951,137 @@ void printInstrOp_tofile(enum vmopcode op,FILE* fp){
 	
 }
 
+void printInstructions(){
+	struct instruction* temp = NULL;
+	temp = instructions;
+	unsigned int i=0;
+	printf("\n^^^^^^^^^^^^^ Start printing Instruction Table ^^^^^^^^^^^^^\n");
+	while(temp <= (instructions+nextinstructionlabel()-1)){
+		printf("%d:",i);
+		printInstrOp(temp->opcode);
+		if(&temp->arg1){
+			printVMarg(&temp->arg1);			
+		}
+		if(&temp->arg2){
+			printVMarg(&temp->arg2);
+		}
+		if(&temp->result){
+			printVMarg(&temp->result);
+		}
+		i++;
+		temp = instructions+i;
+		printf("\n");
+	}
+}
 
+
+
+
+void printVMarg(struct vmarg* arg){ 
+	switch(arg->type){
+		case label_a: printf("00, %d\t",arg->val);break; //	label_a
+		case global_a: printf("01, %d:\t",arg->val);printVar(arg->val);break; //global_a
+		case formal_a: printf("02, %d:\t",arg->val);printVar(arg->val);break; //formal_a
+		case local_a: printf("03, %d:\t",arg->val);printVar(arg->val);break; //	local_a
+		case number_a: printf("04, %d:\t",arg->val);printDouble(numConsts[arg->val]);break; //	number_a
+		case string_a: printf("05, %d:%s\t",arg->val, stringConsts[arg->val]);break; //	string_a
+		case bool_a: printf("06, %c\t",arg->val);break; //	bool_a
+		case nil_a: /*printf("\t(nil_a)\t");*/break; //nil_a
+		case userfunc_a: printf("08, %d:  %s\t",arg->val, userFuncs[arg->val].id);break; //	userfunc_a
+		case libfunc_a: printf("09, %d:  %s\t",arg->val, namedLibfuncs[arg->val]);break; //	libfunc_a
+		case retval_a: printf("10, retval\t");break; //	retval_a
+		default: ;//printf("Asserting for arg->val=%d\n",arg->val);assert(0);
+	}
+}
+void printDouble(double x){
+	double z;
+	int y;
+    y = (int)x;
+   	z = (x-y);
+   	if(z == 0)
+       	printf("%.f\t",x);
+   	else
+        printf("%f\t",x);
+}
+void printInstrOp(enum vmopcode op){
+	switch(op){
+		case assign_v:
+			printf("ASSIGN\t");
+			break;
+		case add_v:
+			printf("ADD\t\t");
+			break;
+		case sub_v:
+			printf("SUB\t\t");
+			break;
+		case mul_v:
+			printf("MUL\t\t");
+			break;
+		case div_v:
+			printf("DIV\t\t");
+			break;
+		case mod_v:
+			printf("MOD\t\t");
+			break;
+		case uminus_v:
+			printf("UMINUS\t");
+			break;
+		case and_v:
+			printf("AND");
+			break;
+		case or_v:
+			printf("OR");
+			break;
+		case not_v:
+			printf("NOT");
+			break;
+		case jump_v:
+			printf("JUMP\t\t");
+			break;
+		case jeq_v:
+			printf("Jump_If_Equal ");
+			break;
+		case jne_v:
+			printf("Jump_If_NOTEqual ");
+			break;
+		case jle_v:
+			printf("Jump_If_lessOREqual ");
+			break;
+		case jge_v:
+			printf("Jump_If_greaterOREqual ");
+			break;
+		case jlt_v:
+			printf("Jump_IFLESS\t");
+			break;
+		case jgt_v:
+			printf("Jump_IFGREATER ");
+			break;
+		case call_v:
+			printf("CALL\t\t");
+			break;
+		case pusharg_v:
+			printf("PUSHARG\t");
+			break;
+		case funcenter_v:
+			printf("FuncENTER\t");
+			break;
+		case funcexit_v:
+			printf("FuncEXIT\t");
+			break;
+		case newtable_v:
+			printf("NEWTABLE\t");
+			break;
+		case tablegetelem_v:
+			printf("tableGETelem\t");
+			break;
+		case tablesetelem_v:
+			printf("tableSETelem\t");
+			break;
+		case nop_v:
+			printf("NOP");
+			break;
+	}
+}
 void printNumTable(){
 	unsigned int index;
 	puts("****************** NUM_TABLE Start ******************");

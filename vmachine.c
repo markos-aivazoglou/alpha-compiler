@@ -77,7 +77,7 @@ void execute_cycle(void){
 		return;
 		}
 	else{
-		printf("pc:%d\n",pc);
+		// printf("pc:%d\n",pc);
 		assert(pc < AVM_ENDING_PC);
 		struct instruction* instr = code + pc;
 		assert(
@@ -88,7 +88,6 @@ void execute_cycle(void){
 			currLine = instr->srcLine;
 		unsigned oldPC = pc;
 		(*executeFuncs[instr->opcode])(instr);
-		// printf("pc:%d\n",pc);
 		if(pc == oldPC)
 			++pc;
 	}
@@ -121,9 +120,9 @@ extern void memclear_table(struct avm_memcell* m){
 void execute_assign (struct instruction* instr) {
 	struct avm_memcell* lv = avm_translate_operand(&instr->result,(struct avm_memcell*) 0);
 	struct avm_memcell* rm = avm_translate_operand(&instr->arg1,&ax);
-	assert(lv);
-	assert(&stack[AVM_STACKSIZE-1] >= lv);
-	assert(lv > &stack[top]);
+	// assert(lv);
+	// assert(&stack[AVM_STACKSIZE-1] >= lv);
+	// assert(lv > &stack[top]);
 	assert(lv && ( &stack[AVM_STACKSIZE-1] >= lv && lv > &stack[top] || lv == &retval));
 	assert(rm);
 	avm_assign(lv,rm);
@@ -166,7 +165,8 @@ void execute_call (struct instruction* instr) {
 	switch (func->type) {
 	
 		case userfunc_m : {
-			pc = func->data.funcVal;
+
+			pc = userFuncs[func->data.funcVal].address;
 			assert(pc < AVM_ENDING_PC);
 			assert(code[pc].opcode == funcenter_v);
 			break;
@@ -205,7 +205,6 @@ void avm_push_envvalue(unsigned int val) {
 
 void avm_callsaveenvironment (void){
 	avm_push_envvalue(totalActuals);
-	printf("pc on push:%d\n",pc);
 	avm_push_envvalue(pc+1);
 	avm_push_envvalue(top + totalActuals +2);
 	avm_push_envvalue(topsp);
@@ -215,7 +214,6 @@ void avm_callsaveenvironment (void){
 void execute_funcenter (struct instruction* instr){
 		struct avm_memcell* func = avm_translate_operand(&instr->result,&ax);
 		assert(func);
-		printf("pc on enter:%d\n",pc);
 		assert(pc == func->data.funcVal); /*  func address should match pc*/
 		/* Callee actions here */
 		totalActuals = 0;
@@ -233,11 +231,9 @@ unsigned int avm_get_envvalue (unsigned int i) {
 
 void execute_funcexit(struct instruction* unused) {				/* Epanafora prohgoumenou perivallontos,kai epistrofh apo thn klhsh */
 	unsigned int oldTop = top;
-	printf("topsp dunno:%d\n",topsp);
 	pc = 		avm_get_envvalue(topsp + AVM_SAVEDPC_OFFSET);
 	top = 		avm_get_envvalue(topsp + AVM_SAVEDTOP_OFFSET);
 	topsp = 	avm_get_envvalue(topsp + AVM_SAVEDTOPSP_OFFSET);
-	printf("pc on exit:%d\n",pc); //FUCKED UP GIATI DEN EXEI PATCHED TO JUMP THS SUNARTHSHS
 	while(oldTop++ <= top) /* Intentionally ignoring first*/     /* GARBADGE COLLECTION */
 		avm_memcellclear(&stack[oldTop]);
 }
@@ -286,7 +282,7 @@ struct avm_memcell* avm_getactual(unsigned int i){
 
 
 
-void execute_pusharg (struct instruction* instr) {
+void execute_pusharg (struct instruction* instr) { //TODO:Arguements passed in reverse order
 	struct avm_memcell* arg = avm_translate_operand(&instr->result,&ax);
 	assert(arg);
 	/* This is actually stack[top] = arg, but we have to use avm_assign.*/
@@ -509,10 +505,10 @@ void execute_jne(struct instruction* instr){
 		pc = instr->result.val;
 }
 
-char cmp_gt(double x, double y){return x>y;}
-char cmp_ge(double x, double y){return x>=y;}
-char cmp_lt(double x, double y){return x<y;}
-char cmp_le(double x, double y){return x<=y;}
+int cmp_gt(double x, double y){return x>y;}
+int cmp_ge(double x, double y){return x>=y;}
+int cmp_lt(double x, double y){return x<y;}
+int cmp_le(double x, double y){return x<=y;}
 
 void execute_comparative(struct instruction* instr){
 	assert(instr->result.type == label_a);
@@ -615,6 +611,7 @@ void avm_initialize(void) {
 
 	avm_readbinary();
 	avm_initstack();
+	// printf("globals:%d\n",globalvars);
 	top = AVM_STACKSIZE - 1 - globalvars;
 	topsp = top;
 	avm_registerlibfunc("print",libfunc_print);
@@ -775,7 +772,15 @@ void execute_nop(struct instruction* instr){}
 char* number_tostring(struct avm_memcell* m){
 	char *buff;buff = malloc(sizeof(m->data.numVal));
 	memset(buff,'\0',sizeof(buff));
-	sprintf(buff,"%f",m->data.numVal);
+	// sprintf(buff,"%f",m->data.numVal);
+	double z,x=m->data.numVal;
+	int y;
+    y = (int)x;
+   	z = (x-y);
+   	if(z == 0)
+       	sprintf(buff,"%.f",x);
+   	else
+       	sprintf(buff,"%f",x);
 	return buff;
 }
 char* string_tostring(struct avm_memcell* m){
@@ -795,32 +800,32 @@ char* undef_tostring(struct avm_memcell* m){}
 
 
 
-void printDouble(double x){
-	double z;
-	int y;
-    y = (int)x;
-   	z = (x-y);
-   	if(z == 0)
-       	printf("%.f\t",x);
-   	else
-       	printf("%f\t",x);
-}
-void printNumTable(){
-	unsigned int index;
-	puts("****************** NUM_TABLE Start ******************");
-	for(index=0;index<totalNumConsts;index++){
-		printf("%d|\t",index);printDouble(numConsts[index]);printf("\n");
-	}
-	puts("------------------ NUM_TABLE End ------------------");
-}
-void printUserfuncTable(){
-	unsigned int index;
-	puts("****************** USERFUNC_TABLE Start ******************");
-	for(index=0;index<totalUserFuncs;index++){
-		printf("%d|\t%s\n",index,(userFuncs[index].id));
-	}
-	puts("------------------ USERFUNC_TABLE End ------------------");
-}
+// void printDouble(double x){
+// 	double z;
+// 	int y;
+//     y = (int)x;
+//    	z = (x-y);
+//    	if(z == 0)
+//        	printf("%.f\t",x);
+//    	else
+//        	printf("%f\t",x);
+// }
+// void printNumTable(){
+// 	unsigned int index;
+// 	puts("****************** NUM_TABLE Start ******************");
+// 	for(index=0;index<totalNumConsts;index++){
+// 		printf("%d|\t",index);printDouble(numConsts[index]);printf("\n");
+// 	}
+// 	puts("------------------ NUM_TABLE End ------------------");
+// }
+// void printUserfuncTable(){
+// 	unsigned int index;
+// 	puts("****************** USERFUNC_TABLE Start ******************");
+// 	for(index=0;index<totalUserFuncs;index++){
+// 		printf("%d|\t%s\n",index,(userFuncs[index].id));
+// 	}
+// 	puts("------------------ USERFUNC_TABLE End ------------------");
+// }
 
 void avm_readbinary(void){
 	int i,j;
@@ -888,6 +893,8 @@ void avm_readbinary(void){
 	i = atoi(buf);
 	codeSize = i-1;
 	code=(struct instruction*)malloc(sizeof(struct instruction)*i);
+
+
 	/*read instructions table*/
 	for(j=0;j<i;j++){
 	    fscanf(fp,"%s",buf);
@@ -902,7 +909,7 @@ void avm_readbinary(void){
 	    if(tok[1]){
 			inst2 = strtol(tok[1],NULL,10);
 			(code+j)->arg1.val = inst2;
-			if(inst1==1 && globalvars<=inst2){
+			if((inst1==1 || inst1==8) && globalvars<=inst2){
 				globalvars++;
 			}
 	    }
@@ -917,7 +924,7 @@ void avm_readbinary(void){
 	    if(tok[1]){
 			inst2 = strtol(tok[1],NULL,10);
 			(code+j)->arg2.val = inst2;
-			if(inst1==1 && globalvars<=inst2){
+			if((inst1==1 || inst1==8) && globalvars<=inst2){
 				globalvars++;
 			}
 	    }
@@ -933,7 +940,7 @@ void avm_readbinary(void){
 	    if(tok[1]){
 			inst2 = strtol(tok[1],NULL,10);
 			(code+j)->result.val = inst2;
-			if(inst1==1 && globalvars<=inst2){
+			if((inst1==1 || inst1==8) && globalvars<=inst2){
 				globalvars++;
 			}
 	    }

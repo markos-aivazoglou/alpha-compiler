@@ -257,10 +257,10 @@ arithmetic_func_t arithmeticFuncs[]={
 };
 
 typedef int(*cmp_func)(double,double);
-char cmp_gt(double x, double y);
-char cmp_ge(double x, double y);
-char cmp_lt(double x, double y);
-char cmp_le(double x, double y);
+int cmp_gt(double x, double y);
+int cmp_ge(double x, double y);
+int cmp_lt(double x, double y);
+int cmp_le(double x, double y);
 void execute_comparative(struct instruction* instr);
 cmp_func comparisonFuncs[] = {
 	cmp_le,

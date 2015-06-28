@@ -90,6 +90,13 @@ struct incomplete_jump{
 	struct incomplete_jump*	next;	// A trivial linked list.
 };
 
+typedef struct func_start{
+	unsigned int instrNo;
+	struct func_start* next;
+}func_start;
+typedef struct func_end{
+	unsigned int instrNo;
+}func_end;
 void expand_instructions(void);
 void emit_instruction(struct instruction* t);
 void printInstructions();
@@ -110,6 +117,7 @@ void printLibfuncTable_tofile(FILE* fp);
 void printStringTable_tofile(FILE* fp);
 void printUserfuncTable_tofile(FILE* fp);
 void printNumTable_tofile(FILE* fp);
+void printTables_tofile(void);
 void printInstructions_tofile(FILE* fp);
 void printVMarg_tofile(struct vmarg* arg,FILE* fp);
 void printInstrOp_tofile(enum vmopcode op,FILE* fp);
@@ -120,6 +128,8 @@ void make_retvaloperand(struct vmarg* arg);
 void generate_instr(enum vmopcode op,quad* quad);
 void generate(void);
 void generate_relational (int op,quad* quad);
+void add_func_jump(unsigned int instrNo);
+void patch_func_jump(unsigned int i);
 void add_incomplete_jump(unsigned instrNo, unsigned iaddress);
 void append(struct userfunc* head, unsigned int instNo);
 void patch_returns(struct userfunc* head, unsigned int instrNo);

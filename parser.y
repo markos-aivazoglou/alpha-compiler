@@ -1007,7 +1007,7 @@ loopend   :  {--loopcounter;}
 returnstmt : RETURN returnstmt2 SEMICOLON	{$$=(expr*)malloc(sizeof(expr));$$=$2;printf("RETURN\n");if(funcflag==0){printf("Cannot use return while not in function ERROR\n");}}
 ;
 
-returnstmt2 : expr			{if(funcflag>0){$$=(expr*)malloc(sizeof(expr));$$=$1;emit(ret,NULL,NULL,$1,-1,yylineno);}else{printf("Cannot use return outside a function ERROR\n");}}
+returnstmt2 : expr			{if(funcflag>0){$$=(expr*)malloc(sizeof(expr));$$=$1;emit(ret,$1,NULL,NULL,-1,yylineno);}else{printf("Cannot use return outside a function ERROR\n");}}
 	|	{if(funcflag>0){$$=(expr*)malloc(sizeof(expr));emit(ret,NULL,NULL,NULL,-1,yylineno);}else{printf("Cannot use return outside a function ERROR\n");}}
 	;
 	
@@ -1043,7 +1043,7 @@ int main(int argc, char **argv)
 		insert(Table,"objectmemberkeys",LIBFUNC,0,0);
 		insert(Table,"objecttotalmembers",LIBFUNC,0,0);
 		insert(Table,"objectcopy",LIBFUNC,0,0);
-		insert(Table,"totalarguements",LIBFUNC,0,0);
+		insert(Table,"totalarguments",LIBFUNC,0,0);
 		insert(Table,"arguement",LIBFUNC,0,0);
 		insert(Table,"typeof",LIBFUNC,0,0);
 		insert(Table,"strtonum",LIBFUNC,0,0);
