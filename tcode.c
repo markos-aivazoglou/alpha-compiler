@@ -26,7 +26,7 @@ struct incomplete_jump*	ij_head = (struct incomplete_jump*) 0;
 unsigned int		ij_total = 0;
 
 /* Userfunc Stack */
-struct userfunc* funcstack=NULL; 
+struct userfunc* funcstack=NULL;
 int stack_size = 0;
 int stack_top =0;
 func_start* fstart = (func_start *)0;
@@ -71,7 +71,7 @@ generator_func_t generators[] = {
 	generate_FUNCEND,
 	generate_NEWTABLE,
 	generate_TABLEGETELEM,
-	generate_JUMP,	
+	generate_JUMP,
 	generate_TABLESETELEM
 };
 
@@ -110,9 +110,8 @@ void make_operand(expr* e,struct vmarg* arg){
 		return;
 	}*/
 	// printf("name:%s and type:%d\n",e->name);
-	switch(e->type){ 
+	switch(e->type){
 		case var_e:{
-
 			arg->val = e->sym->offset;
 			newvar(e->sym->offset,e->sym->name);
 			switch(e->sym->space){
@@ -122,19 +121,8 @@ void make_operand(expr* e,struct vmarg* arg){
 				default: assert(0);
 			}
 			break;			/*n from case newtable_e */
-		}				
-		case tableitem_e:{			
-			arg->val = e->sym->offset;
-			switch(e->sym->space){
-				case programvar:		arg->type = global_a; 	break;
-				case functionlocal: 	arg->type = local_a;	break;
-				case formalarg:			arg->type = formal_a;	break;
-				default: assert(0);
-			}
-			break;			/*n from case newtable_e */
-		}				
-		case boolexpr_e:{
-			newvar(e->sym->offset,e->sym->name);
+		}
+		case tableitem_e:{
 			arg->val = e->sym->offset;
 			switch(e->sym->space){
 				case programvar:		arg->type = global_a; 	break;
@@ -144,8 +132,18 @@ void make_operand(expr* e,struct vmarg* arg){
 			}
 			break;			/*n from case newtable_e */
 		}
-		case assignexpr_e:{		
-			
+		case boolexpr_e:{
+			arg->val = e->sym->offset;
+			newvar(e->sym->offset,e->sym->name);
+			switch(e->sym->space){
+				case programvar:		arg->type = global_a; 	break;
+				case functionlocal: 	arg->type = local_a;	break;
+				case formalarg:			arg->type = formal_a;	break;
+				default: assert(0);
+			}
+			break;			/*n from case newtable_e */
+		}
+		case assignexpr_e:{
 			arg->val = e->sym->offset;
 			newvar(e->sym->offset,e->sym->name);
 			switch(e->sym->space){
@@ -155,8 +153,8 @@ void make_operand(expr* e,struct vmarg* arg){
 				default: assert(0);
 			}
 			break;			/*n from case newtable_e */
-		}			
-		case newtable_e:{			
+		}
+		case newtable_e:{
 			arg->val = e->sym->offset;
 			switch(e->sym->space){
 				case programvar:		arg->type = global_a; 	break;
@@ -168,7 +166,8 @@ void make_operand(expr* e,struct vmarg* arg){
 		}
 		/* Constants */
 		case constbool_e:{
-			arg->val = e->boolConst;
+			unsigned int temp = (unsigned int)e->boolConst;
+			arg->val =e->boolConst;
 			arg->type = bool_a;	break;
 		}
 		case conststring_e:{
@@ -180,7 +179,7 @@ void make_operand(expr* e,struct vmarg* arg){
 			arg->type = number_a;	break;
 		}
 		case nil_e: arg->type = nil_a;	break;
-		
+
 		/* Functions */
 		case programfunc_e:{
 			// printf("in tcode address is:%d\n",e->sym->taddress);
@@ -238,7 +237,7 @@ unsigned int consts_newstring(char* s){
 unsigned int consts_newnumber(double n){
 	assert(totalNumConsts < TABLE_SIZE);
 	unsigned int index;
-	for(index=0; index <= totalNumConsts; index++){
+	for(index=0; index < totalNumConsts; index++){
 		if(numConsts[index] == n)
 			return index;
 	}
@@ -257,7 +256,7 @@ unsigned int userfuncs_newfunc(struct symbol* sym){
 		userFuncs = temp;
 		userfunc_table_size += 50;
 	}
-	
+
 	unsigned int index;
 	for(index =0; index<totalUserFuncs; index++){
 		if(sym->taddress == (userFuncs+index)->address){
@@ -267,7 +266,6 @@ unsigned int userfuncs_newfunc(struct symbol* sym){
 	(userFuncs+totalUserFuncs)->address = sym->taddress;
 	(userFuncs+totalUserFuncs)->id = sym->name;
 	(userFuncs+totalUserFuncs)->localSize = sym->totallocals;
-	//TODO init localsize.
 	return totalUserFuncs;
 }
 
@@ -292,7 +290,7 @@ void make_numberoperand(struct vmarg* arg, double val){
 }
 
 void make_booloperand(struct vmarg* arg, unsigned char val){
-	arg->val = val;
+	arg->val = (unsigned int)val;
 	arg->type = bool_a;
 }
 
@@ -304,18 +302,21 @@ void make_retvaloperand(struct vmarg* arg){
 void generate_instr(enum vmopcode op,quad* quad){
 	struct instruction t;
 	t.opcode = op;
+	if(op==23){
+		printf("element:%lf,type:%d\n",quad->arg1->numConst,quad->arg1->type );
+	}
 	make_operand(quad->arg1, &(t.arg1));
-	make_operand(quad->arg2, &(t.arg2));	
+	make_operand(quad->arg2, &(t.arg2));
 	make_operand(quad->result, &(t.result));
 	quad->taddress = nextinstructionlabel();
-	emit_instruction(&t);      
+	emit_instruction(&t);
 }
 
 void generate(void){
 		unsigned int i;
 		for(i=0;i<nextquadlabel();i++){
 			(*generators[quads[i].op])(quads+i);
-			
+
 		}
 		patch_incomplete_jumps(nextquadlabel(), currInstruction);
 }
@@ -324,7 +325,7 @@ void generate_ADD (quad* quad) 						{ generate_instr(add_v, quad); }
 void generate_SUB (quad* quad) 						{ generate_instr(sub_v, quad); }
 void generate_MUL (quad* quad) 						{ generate_instr(mul_v, quad); }
 void generate_DIV (quad* quad) 						{ generate_instr(div_v, quad); }
-void generate_MOD (quad* quad) 						{ generate_instr(mod_v, quad); } 
+void generate_MOD (quad* quad) 						{ generate_instr(mod_v, quad); }
 void generate_NEWTABLE (quad* quad) 					{ generate_instr(newtable_v, quad); }
 void generate_TABLEGETELEM (quad* quad) 					{ generate_instr(tablegetelem_v, quad); }
 void generate_TABLESETELEM (quad* quad) 					{ generate_instr(tablesetelem_v, quad); }
@@ -336,13 +337,14 @@ void generate_IF_NOTEQ(quad* quad) 					{ generate_relational(jne_v, quad); }
 void generate_IF_GREATER (quad* quad) 					{ generate_relational(jgt_v, quad); }
 void generate_IF_GREATEREQ(quad* quad) 					{ generate_relational(jge_v, quad); }
 void generate_IF_LESS (quad* quad) 					{ generate_relational(jlt_v, quad); }
-void generate_IF_LESSEQ (quad* quad) 					{ generate_relational(jle_v, quad); } 
+void generate_IF_LESSEQ (quad* quad) 					{ generate_relational(jle_v, quad); }
 
 
 
 void generate_relational (int op,quad* quad) {
 	struct instruction t;
 	t.opcode = op;
+	// printf("arg1:%d,arg2:%d\n", quad->arg1->boolConst,quad->arg2->boolConst);
 	make_operand(quad->arg1, &t.arg1);
 	make_operand(quad->arg2, &t.arg2);
 	t.result.type = label_a;
@@ -365,34 +367,34 @@ void generate_AND (quad *quad) {
 	struct instruction t;
 	quad->taddress = nextinstructionlabel();
 	t.opcode = jeq_v;
-	make_operand(quad->arg1, &t.arg1);	
+	make_operand(quad->arg1, &t.arg1);
 	make_booloperand(&t.arg2, '1');
 	t.result.type = label_a;
 	t.result.val = nextinstructionlabel()+4;
 	emit_instruction(&t);
-	
+
 	make_operand(quad->arg2, &t.arg1);
-	t.result.val = nextinstructionlabel()+3;	
+	t.result.val = nextinstructionlabel()+3;
 	emit_instruction(&t);
-	
-	
+
+
 	t.opcode = assign_v;
 	make_booloperand(&t.arg1, '0');
 	reset_operand(&t.arg2);
 	make_operand(quad->result, &t.result);
 	emit_instruction(&t);
-	
-	
-	
+
+
+
 	t.opcode = jump_v;
 	reset_operand (&t.arg1);
 	reset_operand(&t.arg2);
 	t.result.type = label_a;
 	t.result.val = nextinstructionlabel()+2;
 	emit_instruction(&t);
-	
-	
-	
+
+
+
 	t.opcode = assign_v;
 	make_booloperand(&t.arg1, '1');
 	reset_operand(&t.arg2);
@@ -401,7 +403,7 @@ void generate_AND (quad *quad) {
 }
 
 void generate_NOT (quad* quad) {
-	
+
 	quad->taddress = nextinstructionlabel();
 	struct instruction t;
 
@@ -410,7 +412,7 @@ void generate_NOT (quad* quad) {
 	make_booloperand(&t.arg2, '0');
 	t.result.type = label_a;
 	t.result.val  = nextinstructionlabel()+3;
-	emit_instruction(&t); 
+	emit_instruction(&t);
 
 	t.opcode = assign_v;
 	make_booloperand(&t.arg1, '0');
@@ -507,7 +509,7 @@ void generate_FUNCSTART(quad* quad){
 	t0.opcode = jump_v;
 	add_func_jump(nextinstructionlabel());
 	emit_instruction(&t0);
-	
+
 
 
 	struct userfunc* f;
@@ -541,12 +543,12 @@ void generate_RETURN(quad* quad){
 	t.arg2.type=nil_a;
 	make_operand(quad->arg1, &t.arg1);
 	emit_instruction(&t);
-	
+
 	struct userfunc* f;
 	f = functop(funcstack);
 	f->returnList = (struct userfunc*)malloc(sizeof(struct userfunc));
 	append(f->returnList, nextinstructionlabel());
-	
+
 	t.opcode = jump_v;
 	reset_operand(&t.arg1);
 	t.arg1.type = nil_a;
@@ -615,13 +617,13 @@ void add_func_jump(unsigned int instrNo){
 	}
 }
 void patch_func_jump(unsigned int i){
-	
+
 	func_start* temp;
 	temp = fstart;
 	while(temp->next){
 			temp = temp->next;
 	}
-	
+
 	(instructions+temp->instrNo)->result.val = i+1;
 	free(temp);
 }
@@ -648,12 +650,10 @@ void add_incomplete_jump(unsigned instrNo, unsigned iaddress){
 void patch_incomplete_jumps(unsigned int intermediate_code_size,unsigned int target_code_size){    /* Check code place */
 	if(ij_head){
 	while(ij_head){
-		if (ij_head->iaddress == intermediate_code_size){   
+		if (ij_head->iaddress == intermediate_code_size){
 			(instructions+(ij_head->instrNo))->result.val = target_code_size;
 		}
 		else
-			// printf("res:%d\n",ij_head->instrNo);
-			// printf("res2:%d\n",(instructions+(ij_head->instrNo))->result.type);
 			(instructions+(ij_head->instrNo))->result.val = (quads+ij_head->iaddress)->taddress;
 		ij_head = ij_head->next;
 		}
@@ -733,8 +733,8 @@ void printStringTable_tofile(FILE* fp){
 	for(i=0;i<totalStringConsts;i++){
 		fprintf(fp,"%s\n",stringConsts[i]);
 	}
-  
-  
+
+
 }
 void printNumTable_tofile(FILE* fp){
 	int i=0;
@@ -749,7 +749,7 @@ void printNumTable_tofile(FILE* fp){
 	  if(z == 0)
                fprintf(fp,"%.f\t\n",x);
    	  else
-               fprintf(fp,"%.3f\t\n",x);	  
+               fprintf(fp,"%.3f\t\n",x);
 	}
 }
 
@@ -760,33 +760,33 @@ void printUserfuncTable_tofile(FILE* fp){
 	{
 		fprintf(fp,"%d\t%d\t%s\n",userFuncs[index].address,userFuncs[index].localSize,userFuncs[index].id);
 	}
-	
-  
-  
+
+
+
 }
 
 void printLibfuncTable_tofile(FILE* fp){
-	
-	
+
+
 	fprintf(fp,"Library_Functions %d\n",totalNamedLibfuncs);
 	unsigned int index,strsize;
 	for(index=0; index<totalNamedLibfuncs; index++)
 	{
 	  fprintf(fp,"%s\n",namedLibfuncs[index]);
 	}
-	
+
 }
 
 void printInstructions_tofile(FILE* fp){
 	struct instruction* temp = NULL;
 	temp = instructions;
 	unsigned int i=0;
-	fprintf(fp,"total_instructions %d\n",currInstruction);
+	fprintf(fp,"total_instructions %d\n",currInstruction+1);
 	printf("total instr %d\n",currInstruction);
 	while(temp <= (instructions+nextinstructionlabel()-1)){
 		printInstrOp_tofile(temp->opcode,fp);
 		if(&temp->arg1){
-			printVMarg_tofile(&temp->arg1,fp);			
+			printVMarg_tofile(&temp->arg1,fp);
 		}
 		if(&temp->arg2){
 			printVMarg_tofile(&temp->arg2,fp);
@@ -803,43 +803,42 @@ void printInstructions_tofile(FILE* fp){
 
 
 
-void printVMarg_tofile(struct vmarg* arg,FILE* fp){ 
-		
-		
+void printVMarg_tofile(struct vmarg* arg,FILE* fp){
+
 		switch(arg->type){
-		case label_a: 
+		case label_a:
 			      fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
-			      
+
 			      break; //	label_a
 		case global_a: 	fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
-				
+
 				break; //	global_a
 		case formal_a:	fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
-				 
+
 				break; //	formal_a
 		case local_a: 	fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
-				
+
 				break; //	local_a
 		case number_a: 	fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
-				
+
 				break; //	number_a
 		case string_a: 	fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
-				
+
 				break; //	string_a
 		case bool_a: 	fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
-				
+
 				break; //	bool_a
 		case nil_a: 	fprintf(fp,"%d\t\t\t",arg->type);
-				
+
 				break; //nil_a
 		case userfunc_a: fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
-				  
+
 				  break; //	userfunc_a
 		case libfunc_a:  fprintf(fp,"%d,%d\t\t\t",arg->type,arg->val);
-				  
+
 				  break; //	libfunc_a
 		case retval_a: 	fprintf(fp,"%d\t\t\t",arg->type);
-				
+
 				break; //	retval_a
 		default: ;//printf("Asserting for arg->val=%d\n",arg->val);assert(0);
 	}
@@ -849,106 +848,106 @@ void printInstrOp_tofile(enum vmopcode op,FILE* fp){
 	switch(op){
 		case assign_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case add_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case sub_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case mul_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case div_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case mod_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case uminus_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case and_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case or_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case not_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case jump_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case jeq_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case jne_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case jle_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case jge_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case jlt_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case jgt_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case call_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case pusharg_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case funcenter_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case funcexit_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case newtable_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case tablegetelem_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case tablesetelem_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 		case nop_v:
 			fprintf(fp,"%d\t\t",op);
-			
+
 			break;
 	}
-	
+
 }
 
 void printInstructions(){
@@ -960,7 +959,7 @@ void printInstructions(){
 		printf("%d:",i);
 		printInstrOp(temp->opcode);
 		if(&temp->arg1){
-			printVMarg(&temp->arg1);			
+			printVMarg(&temp->arg1);
 		}
 		if(&temp->arg2){
 			printVMarg(&temp->arg2);
@@ -977,7 +976,7 @@ void printInstructions(){
 
 
 
-void printVMarg(struct vmarg* arg){ 
+void printVMarg(struct vmarg* arg){
 	switch(arg->type){
 		case label_a: printf("00, %d\t",arg->val);break; //	label_a
 		case global_a: printf("01, %d:\t",arg->val);printVar(arg->val);break; //global_a
@@ -1114,7 +1113,7 @@ void printLibfuncTable(){
   puts("****************** LIBFUNC_TABLE Start ******************");
   for(index=0; index < totalNamedLibfuncs;index++){
 		printf("%d|\t%s()\n",index,*(namedLibfuncs+index));
-		
+
 	}
   puts("------------------ LIBFUNC_TABLE End ------------------");
 }

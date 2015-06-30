@@ -29,7 +29,7 @@ expr* emit_iftableitem(expr* e){
 	if(e->type != tableitem_e){
 		return e;
 	}
-	else{		
+	else{
 	   	result = newexpr(var_e);
 		result->sym = newtemp(Table);
 		emit(tablegetelem,e,e->index,result,-1,yylineno);
@@ -74,40 +74,18 @@ expr* newexpr_constbool(unsigned char c){
 }
 
 expr* reverse(expr* head){
-	expr* reversed = NULL;
-	expr* temp1 = NULL;
-	expr* temp2 = NULL;
-	expr* delete = NULL;
+	expr* new_root = 0;
 	while(head){
-		temp1 = head;
-		delete = temp1;
-		while(temp1->next){
-			
-			delete = temp1;
-			temp1 = temp1->next;
-		}
-		if(head->next){
-			delete->next = NULL;
-		}
-		else{
-			head = NULL;
-		}
-		if(reversed){
-			temp2 = reversed;
-			while(temp2->next){
-				temp2 = temp2->next;
-			}
-			temp2->next = temp1;
-		}
-		else{
-			reversed = temp1;
-		}
+		expr* next = head->next;
+		head->next = new_root;
+		new_root = head;
+		head = next;
 	}
-	return reversed;
+	return new_root;
 }
 
 expr* lvalue_expr(struct symbol* sym){
-	
+
 	assert(sym);
 	expr* e = (expr*) malloc(sizeof(expr));
 	memset(e,0,sizeof(expr));
@@ -147,7 +125,7 @@ unsigned int nextquadlabel (void){
 }
 
 void patchlabel (unsigned int quadNo, unsigned int label){
-	
+
 	assert(quadNo < currQuad);
 	quads[quadNo].label = label;
 }
@@ -164,7 +142,7 @@ void expand (void){
 }
 
 void emit(enum iopcode op,expr* arg1,expr* arg2,expr* result,unsigned int label,unsigned int line){
-	
+
 	if(currQuad == total){
 		expand();}
 	quad* p   = quads+currQuad++;
@@ -250,7 +228,7 @@ expr* op_expr(symTable Table,enum iopcode op,expr* arg1,expr* arg2){
 	else{
 		printf("expr_op ERROR\n");
 	}
-	
+
 }
 
 expr* bool_expr(symTable Table,enum iopcode op,expr* arg1,expr* arg2){
@@ -294,11 +272,11 @@ expr* bool_expr(symTable Table,enum iopcode op,expr* arg1,expr* arg2){
 			nExpr = newexpr(boolexpr_e);
 			sym = newtemp(Table);
 			nExpr->sym = sym;
-			nExpr->truelist = newlist(nextquadlabel());nExpr->falselist = newlist(nextquadlabel()+2);puts("CRITERIA 1");
+			nExpr->truelist = newlist(nextquadlabel());nExpr->falselist = newlist(nextquadlabel()+2);
 			emit(op,arg1,arg2,NULL,nextquadlabel()+3,yylineno);
-			emit(assign,newexpr_constbool('0'),NULL,nExpr,-1,yylineno);
+			emit(assign,newexpr_constbool(0),NULL,nExpr,-1,yylineno);
 			emit(jump,NULL,NULL,NULL,nextquadlabel()+2,yylineno);
-			emit(assign,newexpr_constbool('1'),NULL,nExpr,-1,yylineno);		
+			emit(assign,newexpr_constbool(1),NULL,nExpr,-1,yylineno);
 		}
 		else{
 			printf("Can't compare non-numeric args ERROR\n");
@@ -309,11 +287,11 @@ expr* bool_expr(symTable Table,enum iopcode op,expr* arg1,expr* arg2){
 			nExpr = newexpr(boolexpr_e);
 			sym = newtemp(Table);
 			nExpr->sym = sym;
-			nExpr->truelist = newlist(nextquadlabel());nExpr->falselist = newlist(nextquadlabel()+2);puts("CRITERIA 2");
+			nExpr->truelist = newlist(nextquadlabel());nExpr->falselist = newlist(nextquadlabel()+2);
 			emit(op,arg1,arg2,NULL,nextquadlabel()+3,yylineno);
-			emit(assign,newexpr_constbool('0'),NULL,nExpr,-1,yylineno);
+			emit(assign,newexpr_constbool(0),NULL,nExpr,-1,yylineno);
 			emit(jump,NULL,NULL,NULL,nextquadlabel()+2,yylineno);
-			emit(assign,newexpr_constbool('1'),NULL,nExpr,-1,yylineno);	
+			emit(assign,newexpr_constbool(1),NULL,nExpr,-1,yylineno);
 			}
 		else{
 			printf("Can't compare different types ERROR\n");
@@ -339,11 +317,11 @@ expr* member_item(expr* lvalue,char * id){
 	item->index = newexpr_conststring(id);
 	return item;
 }
-	
+
 expr* make_call(expr* lvalue,expr* elist){
 	expr* func ;
 	func = emit_iftableitem(lvalue);
-	
+
 	if(elist!=NULL){
 	elist = reverse(elist);
 	}
@@ -415,7 +393,7 @@ struct symbol * newtemp(symTable Table){
 
 
 struct symbol* newSymbol(const char * name){
-		
+
 		struct symbol* sym = NULL;
 		sym = (struct symbol*)malloc(sizeof(struct symbol));
 		sym->type = var_s;
@@ -425,7 +403,7 @@ struct symbol* newSymbol(const char * name){
 		sym->scope = currScope();
 		sym->line = yylineno;
 		return sym;
-}	
+}
 
 
 void resetTemp(){
@@ -462,7 +440,7 @@ void printQuads(){
 	tempQuad = quads;
 	int i=0;
 	printf("8==============> QUAD PRINTING STARTING HERE <================8\n");
- 	while(i<nextquadlabel()){		
+ 	while(i<nextquadlabel()){
   		printf("%d:",i);
   		printOp(tempQuad);
   		if(tempQuad->arg1){
@@ -493,7 +471,7 @@ void printExpr(expr* arg){
  	double x,z;
  	int y;
   	switch(arg->type){
-  	case var_e:   		
+  	case var_e:
 		printf("\t%s",arg->sym->name);
    		break;
   	case tableitem_e:
@@ -527,12 +505,12 @@ void printExpr(expr* arg){
                 	printf("\t%f",x);
    	break;
   	case constbool_e://boolConst
-   		if(arg->boolConst == '1'){
+   		if(arg->boolConst == 1){
   		 	printf(" TRUE");
 		}
-		else if(arg->boolConst == '0'){
+		else if(arg->boolConst == 0){
 		 	printf(" FALSE");
-		}  		
+		}
 		break;
   	case conststring_e://strConst
    		printf("\t%s",arg->strConst);
@@ -626,7 +604,7 @@ void printOp(quad* p){
  	case tablesetelem:
   		printf("TABLESETELEM\t");
   		break;
- 
+
  	default:assert(0);
 	}
 }
@@ -640,7 +618,7 @@ void printQuads2(){
 	FILE *fp;
 	if(fp = fopen("intermediate.txt","w")){
  	while(tempQuad->label){
-		
+
   		fprintf(fp,"%d:",i);
   		printOp2(tempQuad,fp);
   		if(tempQuad->arg1){
@@ -709,12 +687,12 @@ void printExpr2(expr* arg, FILE* fp){
                 	fprintf(fp,"  %f  ",x);
    	break;
   	case constbool_e://boolConst
-   		if(arg->boolConst == '1'){
+   		if(arg->boolConst == 1){
   		 	fprintf(fp,"  TRUE");
 		}
-		else if(arg->boolConst == '0'){
+		else if(arg->boolConst == 0){
 		 	fprintf(fp,"  FALSE");
-		}   		
+		}
 		break;
   	case conststring_e://strConst
    		fprintf(fp,"  %s  ",arg->strConst);
@@ -805,15 +783,7 @@ void printOp2(quad* p, FILE* fp){
  	case tablesetelem:
   		fprintf(fp,"TABLESETELEM");
   		break;
- 
+
  	default:assert(0);
 	}
 }
-
-
-
-
-
-
-
-

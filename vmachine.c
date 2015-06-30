@@ -36,7 +36,7 @@ struct avm_memcell* avm_translate_operand (struct vmarg* arg,struct avm_memcell*
 		case local_a:	return &stack[topsp-arg->val];
 		case formal_a:	return &stack[topsp+AVM_STACKENV_SIZE+1+arg->val];
 		case retval_a:	return &retval;
-		
+
 		case number_a:{
 			reg->type = number_m;
 			reg->data.numVal = consts_getnumber(arg->val);
@@ -132,23 +132,23 @@ void avm_assign (struct avm_memcell* lv,struct avm_memcell* rv){
 
 
 	if(lv == rv){puts("Same cells to assign.");		// Same cells ? destructive to assign
-		return;}	
-		
+		return;}
+
 	if(lv->type == table_m && rv->type == table_m && lv->data.tableVal == rv->data.tableVal)  // Same tables? no need to assign
 		return;
-		
+
 	if (rv->type == undef_m)			// From undefined r-value : warning
 		avm_warning("assigning from undef content!");
-	
+
 	avm_memcellclear(lv);
-	
+
 	memcpy(lv,rv,sizeof(struct avm_memcell));
 
 	// Now take care of copied values or reference counting
-	
+
 	if(lv->type == string_m)
 		lv->data.strVal = strdup(rv->data.strVal);
-			
+
 	else{
 		if(lv->type == table_m)
 			avm_tableincrefcounter(lv->data.tableVal);
@@ -163,7 +163,7 @@ void execute_call (struct instruction* instr) {
 	assert(func);
 	avm_callsaveenvironment();
 	switch (func->type) {
-	
+
 		case userfunc_m : {
 
 			pc = userFuncs[func->data.funcVal].address;
@@ -171,10 +171,10 @@ void execute_call (struct instruction* instr) {
 			assert(code[pc].opcode == funcenter_v);
 			break;
 		}
-		
+
 		case string_m : avm_calllibfunc(func->data.strVal); break;
 		case libfunc_m : avm_calllibfunc(func->data.libfuncVal);break;
-		
+
 		default : {
 				char* s = avm_tostring(func);
 				avm_error("call : cannot bind '%s' to function!",s);
@@ -182,18 +182,18 @@ void execute_call (struct instruction* instr) {
 				executionFinished = 1;
 		}
 	}
-	
+
 }
 
 
 void avm_dec_top (void){   //CALLING FUNCTIONS
 	if(!top){		//stack overflow
 		executionFinished = 1;
-		
+
 	}
-	else 
+	else
 		--top;
-		
+
 }
 
 
@@ -217,11 +217,11 @@ void execute_funcenter (struct instruction* instr){
 		assert(pc == func->data.funcVal); /*  func address should match pc*/
 		/* Callee actions here */
 		totalActuals = 0;
- 		struct userfunc* funcInfo = avm_getfuncinfo(pc);
+		struct userfunc* funcInfo = avm_getfuncinfo(pc);
 		topsp = top;
 		top = top - funcInfo->localSize;
 }
-	
+
 unsigned int avm_get_envvalue (unsigned int i) {
 	assert(stack[i].type == number_m);
 	unsigned int val = (unsigned int) stack[i].data.numVal;
@@ -272,8 +272,8 @@ unsigned int avm_totalactuals(void){
 struct avm_memcell* avm_getactual(unsigned int i){
 	assert(i < avm_totalactuals());
 	return &stack[topsp + AVM_STACKENV_SIZE + 1 +i];
-		
-  
+
+
 }
 
 /*		Implementation of the library function 'print'
@@ -319,10 +319,10 @@ void execute_arithmetic(struct instruction* instr){
 	struct avm_memcell* lv = avm_translate_operand(&instr->result,(struct avm_memcell*)0);
 	struct avm_memcell* rv1 = avm_translate_operand(&instr->arg1, &ax);
 	struct avm_memcell* rv2 = avm_translate_operand(&instr->arg2, &bx);
-	
+
 	assert(lv && (&stack[AVM_STACKSIZE-1] >=lv && lv > &stack[top] || lv==&retval));
 	assert(rv1 && rv2);
-	
+
 	if(rv1->type != number_m || rv2->type != number_m){
 		avm_error("not a number in arithmetic!\n");
 		executionFinished = 1;
@@ -348,7 +348,7 @@ unsigned char nil_tobool (struct avm_memcell* m) {return 0;}
 unsigned char undef_tobool(struct avm_memcell* m) {assert(0); return 0;}
 
 unsigned char avm_tobool(struct avm_memcell* m){
-	assert(m->type >0 && m->type < undef_m);
+	assert(m->type >=0 && m->type < undef_m);
 	return (*toboolFuncs[m->type])(m);
 }
 
@@ -358,9 +358,9 @@ void execute_jeq(struct instruction* instr){
 	assert(instr->result.type == label_a);
 	struct avm_memcell* rv1 = avm_translate_operand(&instr->arg1, &ax);
 	struct avm_memcell* rv2 = avm_translate_operand(&instr->arg2, &bx);
-	
+
 	unsigned char result = 0;
-	
+
 	if(rv1->type == undef_m || rv2->type == undef_m){
 		avm_error("'undef' involved in equality!\n");
 	}
@@ -368,7 +368,6 @@ void execute_jeq(struct instruction* instr){
 		result = (rv1->type == nil_m && rv2->type == nil_m);
 	}
 	else if(rv1->type == bool_m || rv2->type == bool_m){
-		printf("im in\n");
 		result = (avm_tobool(rv1) == avm_tobool(rv2));
 		// printf("result on eq:%d on pc:%d\n",result,pc);
 	}
@@ -423,10 +422,10 @@ void execute_jeq(struct instruction* instr){
 				break;
 			}
 			default: assert(0);
-		}		
+		}
 	}
 	if(!executionFinished && result){
-		printf("label on eq:%d\n",instr->result.val);
+		// printf("label on eq:%d\n",instr->result.val);
 		pc = instr->result.val;
 	}
 }
@@ -434,9 +433,9 @@ void execute_jne(struct instruction* instr){
 	assert(instr->result.type == label_a);
 	struct avm_memcell* rv1 = avm_translate_operand(&instr->arg1, &ax);
 	struct avm_memcell* rv2 = avm_translate_operand(&instr->arg2, &bx);
-	
+
 	unsigned char result = 0;
-	
+
 	if(rv1->type == undef_m || rv2->type == undef_m){
 		avm_error("'undef' involved in unequality!\n");
 	}
@@ -498,7 +497,7 @@ void execute_jne(struct instruction* instr){
 				break;
 			}
 			default: assert(0);
-		}		
+		}
 	}
 	if(!executionFinished && result)
 		printf("label:%d\n",instr->result.val);
@@ -524,7 +523,7 @@ void execute_comparative(struct instruction* instr){
 		op = comparisonFuncs[instr->opcode - jle_v];
 		// printf("opcode:%d\n",instr->opcode - jle_v);
 		result = (*op) (rv1->data.numVal, rv2->data.numVal);
-		// printf("result on comp:%d\n",result);	
+		// printf("result on comp:%d\n",result);
 	}
 	if(!executionFinished && result){
 		// printf("label:%d\n",instr->result.val);
@@ -535,7 +534,7 @@ void execute_comparative(struct instruction* instr){
 
 void execute_jump(struct instruction* instr){
 	assert(instr->result.type == label_a);
-	pc = instr->result.val;	
+	pc = instr->result.val;
 	// printf("pc on jump:%d\n",pc);
 
 }
@@ -546,15 +545,15 @@ void execute_jump(struct instruction* instr){
 
 
 /* TABLES*/
-void execute_newtable(struct instruction* instr){         
-	struct avm_memcell* lv = avm_translate_operand(&instr->arg1, (struct avm_memcell*)0);
+void execute_newtable(struct instruction* instr){
+	struct avm_memcell* lv = avm_translate_operand(&instr->result, (struct avm_memcell*)0);
 	assert(lv && (&stack[AVM_STACKSIZE-1] >=lv && &stack[top] < lv || lv == &retval));
 	avm_memcellclear(lv);
-	
+
 	lv->type = table_m;
 	lv->data.tableVal = avm_tablenew();
 	avm_tableincrefcounter(lv->data.tableVal);
-	
+
 }
 
 void execute_tablegetelem(struct instruction* instr){
@@ -564,7 +563,6 @@ void execute_tablegetelem(struct instruction* instr){
 	assert(lv && (&stack[AVM_STACKSIZE-1] >= lv && &stack[top] < lv || lv == &retval));
 	assert(t && &stack[AVM_STACKSIZE-1] >= t && &stack[top] < t);
 	assert(i);
-	
 	avm_memcellclear(lv);
 	lv->type = nil_m; // Default value
 	if(t->type != table_m){
@@ -572,12 +570,14 @@ void execute_tablegetelem(struct instruction* instr){
 	}
 	else{
 		struct avm_memcell* content = avm_tablegetelem(t->data.tableVal,i);
-		if(content)
+		if(content){
 			avm_assign(lv, content);
+			printf("fuck!!!!\n");
+		}
 		else{
 			char* ts = avm_tostring(t);
 			char* is = avm_tostring(i);
-			avm_warning("%s[%s] not found!\n",ts,is);
+			// avm_warning("%s[%s] not found!\n",ts,is);
 			free(ts);
 			free(is);
 		}
@@ -588,10 +588,10 @@ void execute_tablesetelem(struct instruction* instr){
 	struct avm_memcell* t	= avm_translate_operand(&instr->result, (struct avm_memcell*)0);
 	struct avm_memcell* i 	= avm_translate_operand(&instr->arg1, &ax);
 	struct avm_memcell* c 	= avm_translate_operand(&instr->arg2, &bx);
-	
-	assert(t && &stack[0] <= t && &stack[top] > t);
+
+	assert(t && &stack[AVM_STACKSIZE-1] > t && &stack[top] < t);
 	assert(i && c);
-	
+
 	if(t->type != table_m)
 		avm_error("illegal use of type %s as table!\n",typeStrings[t->type]);
 	else
@@ -618,19 +618,20 @@ void avm_initialize(void) {
 	avm_registerlibfunc("typeof",libfunc_typeof);
 	avm_registerlibfunc("totalarguments",libfunc_totalarguments);
 
-	
+
 	/* SAME FOR ALL THE REST LIBRARY FUNCTIONS */
 	/* COMPLETE THE REST OF LIBRARY FUNCTIONS */
-	
+
 }
 void libfunc_print(void){
 	unsigned int n = avm_totalactuals();
 	unsigned int i;
 	for(i = 0;i<n;i++){
 		char* s = strdup(avm_tostring(avm_getactual(i)));
-		puts(s);
+		printf("%s ",s);
 		free(s);
 	}
+	printf("\n");
 }
 
 void libfunc_typeof(void){
@@ -655,7 +656,7 @@ void libfunc_totalarguments(void){
 		retval.type = nil_m;
 	}
 	else{
-		/* Extract the number of actual arguments for 
+		/* Extract the number of actual arguments for
 		the previous activation record. */
 		retval.type = number_m;
 		retval.data.numVal = avm_get_envvalue(p_topsp + AVM_NUMACTUALS_OFFSET);
@@ -694,11 +695,11 @@ void avm_tablebucketsinit(struct avm_table_bucket** p){
 struct avm_table* avm_tablenew(void){
 	struct avm_table* t = (struct avm_table*) malloc(sizeof(struct avm_table));
 	AVM_WIPEOUT(*t);
-	
+
 	t->refCounter = t->total = 0;
 	avm_tablebucketsinit(t->numIndexed);
 	avm_tablebucketsinit(t->strIndexed);
-	
+
 	return t;
 }
 
@@ -744,9 +745,13 @@ library_func_t avm_getlibraryfunc(char* id){
 	int hashindex = (pre_hashnum(id)*211)%12;
 	return libraryFunctionsMap[hashindex]->address;
 }
-struct avm_memcell* avm_tablegetelem(struct avm_table* table,struct avm_memcell* index){}
+struct avm_memcell* avm_tablegetelem(struct avm_table* table,struct avm_memcell* index){
 
-void avm_tablesetelem(struct avm_table* table,struct avm_memcell* index,struct avm_memcell* content){}
+}
+
+void avm_tablesetelem(struct avm_table* table,struct avm_memcell* index,struct avm_memcell* content){
+	
+}
 
 void avm_warning(char* format,...){}
 
@@ -834,11 +839,11 @@ void avm_readbinary(void){
 	double number;
 	unsigned int inst1,inst2,inst;
 	memset(buf,'\0',sizeof(buf));
-	
+
 	fp = fopen("target.txt","r");
 	fscanf(fp,"%s",buf);
 	i = atoi(buf);
-	
+
 	if (i != magicnumber){
 		puts("wrong identifier");
 	}
@@ -848,7 +853,7 @@ void avm_readbinary(void){
 	i = atoi(buf);
 	totalStrConsts = i;
 	/*read string table*/
-	
+
 	for(j=0;j<i;j++){
 	    fscanf(fp,"%s",buf);
 	    stringConsts[j] = strdup(buf);
@@ -900,7 +905,7 @@ void avm_readbinary(void){
 	    fscanf(fp,"%s",buf);
 	    inst = strtol(buf,NULL,10);
 	    (code+j)->opcode = inst;
-	    
+
 	    fscanf(fp,"%s",buf);
 	    tok[0] = strtok(buf,",");
 	    inst1 = strtol(tok[0],NULL,10);
@@ -915,7 +920,7 @@ void avm_readbinary(void){
 	    }
 	    tok[0]=NULL;
 	    tok[1]=NULL;
-	    
+
 	    fscanf(fp,"%s",buf);
 	    tok[0] = strtok(buf,",");
 	    inst1 = strtol(tok[0],NULL,10);
@@ -930,8 +935,8 @@ void avm_readbinary(void){
 	    }
 	    tok[0]=NULL;
 	    tok[1]=NULL;
-	    
-	    
+
+
 	    fscanf(fp,"%s",buf);
 	    tok[0] = strtok(buf,",");
 	    inst1 = strtol(tok[0],NULL,10);
@@ -952,7 +957,8 @@ void avm_readbinary(void){
 void main(void){
     avm_initialize();
     while(!executionFinished){
+		printf("pc:%d\n",pc );
 		execute_cycle();
     }
-  
+
 }

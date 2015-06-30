@@ -89,31 +89,31 @@ enum vmarg_t{
 
 enum vmopcode{
 	assign_v=0,
-	add_v=1,			
+	add_v=1,
 	sub_v=2,
-	mul_v=3,			
-	div_v=4,			
+	mul_v=3,
+	div_v=4,
 	mod_v=5,
 	uminus_v=6,
-	and_v=7,			
+	and_v=7,
 	or_v=8,
-	not_v=9,			
+	not_v=9,
 	jump_v=10,			
-	jeq_v=11,		
+	jeq_v=11,
 	jne_v=12,
-	jle_v=13,			
-	jge_v=14,			
+	jle_v=13,
+	jge_v=14,
 	jlt_v=15,
-	jgt_v=16,			
-	call_v=17,			
+	jgt_v=16,
+	call_v=17,
 	pusharg_v=18,
-	funcenter_v=19,		
-	funcexit_v=20,		
+	funcenter_v=19,
+	funcexit_v=20,
 	newtable_v=21,
-	tablegetelem_v=22,		
-	tablesetelem_v=23,		
+	tablegetelem_v=22,
+	tablesetelem_v=23,
 	nop_v=24
-};		
+};
 
 struct vmarg{
 	enum vmarg_t type;
@@ -206,8 +206,8 @@ execute_func_t executeFuncs[]={
 	execute_jge,
 	execute_jlt,
 	execute_jgt,
-	execute_call,			
-	execute_pusharg,		
+	execute_call,
+	execute_pusharg,
 	execute_funcenter,
 	execute_funcexit,
 	execute_newtable,
@@ -326,7 +326,7 @@ struct avm_memcell stack[AVM_STACKSIZE];
 extern void avm_warning(char* format,...);//de kserw einai meta to ,
 extern void avm_assign (struct avm_memcell* lv,struct avm_memcell* rv);
 
-double consts_getnumber(unsigned int index);   
+double consts_getnumber(unsigned int index);
 char* consts_getstring(unsigned int index);
 struct userfunc* userfuncs_getfuncs(unsigned int index);
 char* libfuncs_getused(unsigned int index);
